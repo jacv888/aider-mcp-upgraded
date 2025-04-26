@@ -1,0 +1,20 @@
+# Core dependencies
+mcp>=0.1.0
+python-dotenv>=1.0.0
+httpx>=0.24.0
+
+# For Aider integration
+# Note: Aider is typically installed separately via its installer
+# curl -s https://aider.chat/install.sh | sh
+
+# Testing dependencies
+pytest>=7.0.0
+
+# Logging
+logging>=0.4.9
+
+# For subprocess management
+concurrent-futures>=3.0.5
+
+# For environment variable management
+python-dotenv>=1.0.0
