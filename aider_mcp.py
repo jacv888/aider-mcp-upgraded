@@ -8,10 +8,6 @@ FALL_BACK_MODEL = "gpt-4.1-mini"
 # Create an MCP server
 mcp = FastMCP("Aidar Coder")
 
-# Create an MCP server
-mcp = FastMCP("Aidar Coder")
-
-
 # Add Aider AI coding tool
 @mcp.tool()
 def code_with_ai(
@@ -42,8 +38,8 @@ def code_with_ai(
             readonly_files = []
 
         # Set default model if not provided
-        if model is None:
-            model = os.environ.get("AIDER_MODEL", FALL_BACK_MODEL)
+        # if model is None:
+        model = os.environ.get("AIDER_MODEL", FALL_BACK_MODEL)
 
         # Call the Aider integration function
         return code_with_aider(

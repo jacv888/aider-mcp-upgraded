@@ -138,23 +138,22 @@ class Coder:
             # Add the message from the prompt file
             cmd.extend(['--message-file', prompt_file])
             
-            # Print the command for debugging
             print(f"Executing command: {' '.join(cmd)}")
-            
-            # Execute the command
+
             result = subprocess.run(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,  # Capture stdout
+                stderr=subprocess.PIPE,  # Capture stderr
                 text=True,
-                check=False,  # Don't raise exception on non-zero exit
+                check=False,
             )
-            
-            # Check if the command executed successfully
+
+            # Return a combination or just stdout/stderr based on success
             if result.returncode == 0:
-                return f"Success: {result.stdout}"
+                return "Success: Aider command completed."
             else:
-                error_msg = f"Error (code {result.returncode}): {result.stderr}"
-                print(f"Aider CLI error: {error_msg}")
+                error_msg = f"Error (code {result.returncode}): {result.stderr.strip()}"
+                print(f"Aider CLI error: {error_msg}")  # Log the error
                 return f"Failed: {error_msg}"
         
         except Exception as e:
