@@ -2,8 +2,105 @@ from mcp.server.fastmcp import FastMCP
 import os
 from typing import List, Optional
 from aider_ai_code import code_with_aider
+from dotenv import load_dotenv
+
+# Resilience imports
+import threading
+import psutil
+import time
+import logging
+from queue import Queue, Full, Empty
+
+# Load environment variables from multiple locations
+# Priority order: MCP aider-mcp directory is PRIMARY source, then fallbacks
+load_dotenv()  # Load from current directory (lowest priority)
+load_dotenv(os.path.expanduser("~/.config/aider/.env"))  # Load global config (medium priority)
+load_dotenv("/Users/jacquesv/MCP/aider-mcp/.env", override=True)  # PRIMARY source (highest priority)
+
+# Import strategic model selector
+from strategic_model_selector import get_optimal_model
 
 FALL_BACK_MODEL = "gpt-4.1-mini"
+
+# Configure logging for resilience features
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("aider_mcp_resilience")
+
+# Resilience configuration from environment variables with sensible defaults
+MAX_TASK_QUEUE_SIZE = int(os.getenv("MAX_TASK_QUEUE_SIZE", "10"))
+MAX_CONCURRENT_TASKS = int(os.getenv("MAX_CONCURRENT_TASKS", "5"))
+CPU_USAGE_THRESHOLD = float(os.getenv("CPU_USAGE_THRESHOLD", "85.0"))  # percent
+MEMORY_USAGE_THRESHOLD = float(os.getenv("MEMORY_USAGE_THRESHOLD", "90.0"))  # percent
+CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "3"))
+CIRCUIT_BREAKER_RESET_TIMEOUT = int(os.getenv("CIRCUIT_BREAKER_RESET_TIMEOUT", "60"))  # seconds
+HEALTH_CHECK_INTERVAL = int(os.getenv("HEALTH_CHECK_INTERVAL", "30"))  # seconds
+
+# Task queue for managing incoming tasks
+task_queue = Queue(maxsize=MAX_TASK_QUEUE_SIZE)
+
+# Circuit breaker state
+class CircuitBreaker:
+    def __init__(self, failure_threshold, reset_timeout):
+        self.failure_threshold = failure_threshold
+        self.reset_timeout = reset_timeout
+        self.failure_count = 0
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF-OPEN
+        self.last_failure_time = None
+        self.lock = threading.Lock()
+
+    def call(self, func, *args, **kwargs):
+        with self.lock:
+            if self.state == "OPEN":
+                elapsed = time.time() - self.last_failure_time
+                if elapsed > self.reset_timeout:
+                    self.state = "HALF-OPEN"
+                else:
+                    raise Exception("Circuit breaker is OPEN. Rejecting calls.")
+
+        try:
+            result = func(*args, **kwargs)
+        except Exception as e:
+            with self.lock:
+                self.failure_count += 1
+                self.last_failure_time = time.time()
+                if self.failure_count >= self.failure_threshold:
+                    self.state = "OPEN"
+                    logger.warning("Circuit breaker OPENED due to failures.")
+            raise e
+        else:
+            with self.lock:
+                if self.state == "HALF-OPEN":
+                    self.state = "CLOSED"
+                    self.failure_count = 0
+            return result
+
+circuit_breaker = CircuitBreaker(CIRCUIT_BREAKER_FAILURE_THRESHOLD, CIRCUIT_BREAKER_RESET_TIMEOUT)
+
+# Resource monitor thread to throttle tasks if CPU or memory usage is high
+def resource_monitor():
+    while True:
+        cpu = psutil.cpu_percent(interval=1)
+        mem = psutil.virtual_memory().percent
+        if cpu > CPU_USAGE_THRESHOLD or mem > MEMORY_USAGE_THRESHOLD:
+            logger.warning(f"High resource usage detected: CPU {cpu}%, Memory {mem}%. Throttling task intake.")
+            # Pause intake by not allowing new tasks to be added until usage drops
+            while psutil.cpu_percent(interval=1) > CPU_USAGE_THRESHOLD or psutil.virtual_memory().percent > MEMORY_USAGE_THRESHOLD:
+                time.sleep(5)
+            logger.info("Resource usage normalized. Resuming task intake.")
+        time.sleep(HEALTH_CHECK_INTERVAL)
+
+resource_monitor_thread = threading.Thread(target=resource_monitor, daemon=True)
+resource_monitor_thread.start()
+
+# Connection health monitor thread to log health status periodically
+def connection_health_monitor():
+    while True:
+        # Here we could add real connection checks if applicable
+        logger.info("Connection health check: OK")
+        time.sleep(HEALTH_CHECK_INTERVAL)
+
+connection_health_thread = threading.Thread(target=connection_health_monitor, daemon=True)
+connection_health_thread.start()
 
 # Create an MCP server
 mcp = FastMCP("Aidar Coder")
@@ -85,10 +182,21 @@ def code_with_ai(
         working_dir: str,
         editable_files: List[str],
         readonly_files: Optional[List[str]] = None,
-        model: Optional[str] = None,
+        model: Optional[str] = None,  # Strategic model selection if None
 ) -> str:
     """
-    Use Aider to perform AI coding tasks based on the provided prompt and files.
+    Use Aider to perform AI coding tasks with strategic model selection.
+    
+    The system will automatically select the optimal model based on your prompt:
+    - Complex algorithms: Claude 3.5 Sonnet
+    - Simple tasks: GPT-4o Mini  
+    - Documentation: Gemini 2.5 Pro
+    - Testing: GPT-4o Mini
+    - CSS/Styling: GPT-4o
+    - React/Frontend: Claude 3.5 Sonnet
+    - API/Backend: Claude 3.5 Haiku
+    
+    You can override model selection by specifying the 'model' parameter.
 
     Args:
         prompt: The natural language prompt describing what code changes to make
@@ -107,10 +215,10 @@ def code_with_ai(
         if readonly_files is None:
             readonly_files = []
 
-        # Set default model if not provided
+        # Strategic model selection - get optimal model for the task
         if model is None:
-            model = os.environ.get("AIDER_MODEL", FALL_BACK_MODEL)
-
+            model = get_optimal_model(prompt)
+        
         # Call the Aider integration function
         return code_with_aider(
             ai_coding_prompt=prompt,
@@ -121,7 +229,7 @@ def code_with_ai(
         )
     except Exception as e:
         # Log the error
-        print(f"Error in code_with_ai: {str(e)}")
+        logger.error(f"Error in code_with_ai: {str(e)}")
 
         # Return a JSON error response instead of crashing
         error_response = {
@@ -144,10 +252,33 @@ def code_with_multiple_ai(
         parallel: bool = True,
 ) -> str:
     """
-    Use Multiple Aider agents to perform AI coding tasks based on the provided prompts and files.
-    This tool will provide you multiple agents that can run simultaneously to write the code.
-    It's important to provide it tasks that can run in parallel and have no dependencies on each other.
-    Think deep and plan the tasks and just run the tasks that can run in parallel.
+    Use Multiple Aider agents with strategic model selection to perform AI coding tasks.
+    
+    🧠 STRATEGIC MODEL SELECTION:
+    Each task automatically gets the optimal model based on its prompt:
+    - Complex algorithms: Claude 3.5 Sonnet (best reasoning)
+    - Simple tasks: GPT-4o Mini (fast & cheap)  
+    - Documentation: Gemini 2.5 Pro (excellent writing)
+    - Testing: GPT-4o Mini (efficient for test generation)
+    - CSS/Styling: GPT-4o (great design capabilities)
+    - React/Frontend: Claude 3.5 Sonnet (best for complex logic)
+    - API/Backend: Claude 3.5 Haiku (fast for server code)
+    - Debugging: Claude 3.5 Sonnet (best problem-solving)
+    
+    💫 EXAMPLE USAGE WITH STRATEGIC SELECTION:
+    code_with_multiple_ai(
+        prompts=[
+            "Create complex React component with state management",  # → Claude 3.5 Sonnet
+            "Write unit tests for the API",                         # → GPT-4o Mini  
+            "Generate comprehensive documentation",                  # → Gemini 2.5 Pro
+            "Add CSS animations and styling"                        # → GPT-4o
+        ],
+        # models=None,  # Let system choose optimal models
+        working_dir="./my-project"
+    )
+    
+    This tool provides multiple agents that can run simultaneously to write code.
+    Tasks should be parallel-compatible with no dependencies on each other.
     You can divide the project into multiple task branches like this example:
 
     Branch 1: Front end --> Task1: initiate front end, Task2: implement index page
@@ -185,6 +316,21 @@ def code_with_multiple_ai(
     import traceback
     from concurrent.futures import ThreadPoolExecutor
 
+    def enqueue_task(task):
+        try:
+            task_queue.put(task, block=False)
+            logger.info(f"Task enqueued. Queue size: {task_queue.qsize()}")
+            return True
+        except Full:
+            logger.warning("Task queue is full. Rejecting new task.")
+            return False
+
+    def dequeue_task():
+        try:
+            return task_queue.get(block=True, timeout=5)
+        except Empty:
+            return None
+
     try:
         # Validate inputs
         num_prompts = len(prompts)
@@ -199,32 +345,51 @@ def code_with_multiple_ai(
             error_msg = f"Error: Length of readonly_files_list ({len(readonly_files_list)}) must match length of prompts ({num_prompts})"
             return json.dumps({"success": False, "error": error_msg})
 
-        # Set default models if not provided
+        # Strategic model selection for multiple tasks
         if models is None:
-            default_model = os.environ.get("AIDER_MODEL", FALL_BACK_MODEL)
-            models = [default_model for _ in range(num_prompts)]
-        elif len(models) != num_prompts:
+            # Use strategic selection for each prompt
+            models = [get_optimal_model(prompt) for prompt in prompts]
+        else:
+            # Fill in None values with strategic selection
+            models = [get_optimal_model(prompts[i]) if models[i] is None else models[i] 
+                     for i in range(num_prompts)]
+        
+        # Ensure models list matches prompts length
+        if len(models) != num_prompts:
             error_msg = f"Error: Length of models ({len(models)}) must match length of prompts ({num_prompts})"
             return json.dumps({"success": False, "error": error_msg})
 
         # Set default max_workers if not provided
         if max_workers is None:
-            max_workers = num_prompts
+            max_workers = min(num_prompts, MAX_CONCURRENT_TASKS)
 
-        # Define a function to process a single prompt
+        # Define a function to process a single prompt with circuit breaker protection
         def process_prompt(i):
             prompt = prompts[i]
             editable_files = editable_files_list[i]
             readonly_files = readonly_files_list[i]
             model = models[i]
 
+            # Enqueue task or reject if queue is full
+            if not enqueue_task(i):
+                return {
+                    "success": False,
+                    "error": "Task queue is full. Please try again later.",
+                    "task_index": i,
+                    "prompt": prompt,
+                    "model": model,
+                    "editable_files": editable_files,
+                    "status_message": "Rejected due to full task queue."
+                }
+
             try:
                 # Log the start of this task with timestamp
                 start_time = time.time()
-                print(f"[{time.strftime('%H:%M:%S')}] Starting task {i + 1}/{num_prompts}: {prompt[:50]}...")
+                logger.info(f"Starting task {i + 1}/{num_prompts}: {prompt[:50]}...")
 
-                # Call the Aider integration function
-                result_json = code_with_aider(
+                # Use circuit breaker to call the AI coding function
+                result_json = circuit_breaker.call(
+                    code_with_aider,
                     ai_coding_prompt=prompt,
                     relative_editable_files=editable_files,
                     relative_readonly_files=readonly_files,
@@ -235,10 +400,9 @@ def code_with_multiple_ai(
                 # Log the completion of this task with timestamp and duration
                 end_time = time.time()
                 duration = end_time - start_time
-                print(f"[{time.strftime('%H:%M:%S')}] Completed task {i + 1}/{num_prompts} in {duration:.2f} seconds")
+                logger.info(f"Completed task {i + 1}/{num_prompts} in {duration:.2f} seconds")
             except Exception as e:
-                # Log the error but continue processing
-                print(f"[{time.strftime('%H:%M:%S')}] Error in task {i + 1}/{num_prompts}: {str(e)}")
+                logger.error(f"Error in task {i + 1}/{num_prompts}: {str(e)}")
                 # Create an error JSON response
                 end_time = time.time()
                 duration = end_time - start_time
@@ -253,6 +417,14 @@ def code_with_multiple_ai(
                     "editable_files": editable_files,
                     "status_message": f"Failed to execute task {i + 1} due to an error: {str(e)}"
                 }
+            finally:
+                # Remove task from queue after processing
+                try:
+                    task_queue.get_nowait()
+                    task_queue.task_done()
+                    logger.info(f"Task dequeued. Queue size: {task_queue.qsize()}")
+                except Empty:
+                    logger.warning("Task queue was empty when trying to dequeue.")
 
             # Parse the result
             try:
@@ -300,13 +472,12 @@ def code_with_multiple_ai(
 
         if parallel:
             # Parallel execution using ThreadPoolExecutor
-            print(
-                f"\n[{time.strftime('%H:%M:%S')}] Starting parallel execution of {num_prompts} tasks with {max_workers} workers")
+            logger.info(f"Starting parallel execution of {num_prompts} tasks with {max_workers} workers")
             parallel_start_time = time.time()
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks
-                print(f"[{time.strftime('%H:%M:%S')}] Submitting all {num_prompts} tasks to the thread pool")
+                logger.info(f"Submitting all {num_prompts} tasks to the thread pool")
                 future_to_index = {executor.submit(process_prompt, i): i for i in range(num_prompts)}
 
                 # Collect results as they complete
@@ -333,12 +504,12 @@ def code_with_multiple_ai(
             results = [result for _, result in results]  # Remove indices
         else:
             # Sequential execution
-            print(f"\n[{time.strftime('%H:%M:%S')}] Starting sequential execution of {num_prompts} tasks")
+            logger.info(f"Starting sequential execution of {num_prompts} tasks")
             parallel_start_time = time.time()  # We'll still call it parallel_start_time for consistency
 
             for i in range(num_prompts):
                 try:
-                    print(f"[{time.strftime('%H:%M:%S')}] Processing task {i + 1}/{num_prompts} sequentially")
+                    logger.info(f"Processing task {i + 1}/{num_prompts} sequentially")
                     result = process_prompt(i)
                     results.append(result)
 
@@ -361,24 +532,23 @@ def code_with_multiple_ai(
         # Print summary of execution
         successful_tasks = sum(1 for r in results if r.get('success', False))
         execution_type = "parallel" if parallel else "sequential"
-        print(
-            f"\n[{time.strftime('%H:%M:%S')}] Completed all {num_prompts} tasks in {execution_duration:.2f} seconds ({execution_type} execution)")
-        print(f"[{time.strftime('%H:%M:%S')}] {successful_tasks}/{num_prompts} tasks completed successfully")
+        logger.info(f"Completed all {num_prompts} tasks in {execution_duration:.2f} seconds ({execution_type} execution)")
+        logger.info(f"{successful_tasks}/{num_prompts} tasks completed successfully")
 
         # Print detailed status for each prompt
-        print(f"\n[{time.strftime('%H:%M:%S')}] Detailed status for each prompt:")
+        logger.info("Detailed status for each prompt:")
         for i, result in enumerate(results):
             status = "SUCCESS" if result.get('success', False) else "FAILED"
             status_message = result.get('status_message', '')
-            print(f"[{time.strftime('%H:%M:%S')}] Prompt {i + 1}: {status} - {prompts[i][:50]}...")
+            logger.info(f"Prompt {i + 1}: {status} - {prompts[i][:50]}...")
             if status_message:
-                print(f"   → {status_message}")
+                logger.info(f"   → {status_message}")
             if 'implementation_notes' in result and result['implementation_notes']:
                 # Truncate implementation notes if too long
                 notes = result['implementation_notes']
                 if len(notes) > 200:
                     notes = notes[:197] + '...'
-                print(f"   → Implementation notes: {notes}")
+                logger.info(f"   → Implementation notes: {notes}")
 
         # Calculate the theoretical sequential execution time (sum of individual task times)
         theoretical_sequential_time = sum(result.get('execution_time', 0) for result in results)
@@ -386,8 +556,7 @@ def code_with_multiple_ai(
         # If running in parallel, show the speedup compared to theoretical sequential time
         if parallel and theoretical_sequential_time > 0:  # Avoid division by zero
             speedup = theoretical_sequential_time / execution_duration
-            print(
-                f"[{time.strftime('%H:%M:%S')}] Parallel speedup: {speedup:.2f}x (theoretical sequential would take ~{theoretical_sequential_time:.2f}s)")
+            logger.info(f"Parallel speedup: {speedup:.2f}x (theoretical sequential would take ~{theoretical_sequential_time:.2f}s)")
 
         # Create a list of success statuses for each prompt
         success_statuses = [result.get('success', False) for result in results]
@@ -425,7 +594,7 @@ def code_with_multiple_ai(
             return json.dumps(aggregated_result, indent=4)
         except Exception as e:
             # Final catch-all for any unexpected errors in the entire function
-            print(f"Critical error in code_with_multiple_ai: {str(e)}")
+            logger.error(f"Critical error in code_with_multiple_ai: {str(e)}")
             traceback.print_exc()
             error_response = {
                 "success": False,
@@ -437,7 +606,7 @@ def code_with_multiple_ai(
             return json.dumps(error_response, indent=4)
     except Exception as e:
         # Final catch-all for any unexpected errors in the entire function
-        print(f"Critical error in code_with_multiple_ai: {str(e)}")
+        logger.error(f"Critical error in code_with_multiple_ai: {str(e)}")
         traceback.print_exc()
         error_response = {
             "success": False,

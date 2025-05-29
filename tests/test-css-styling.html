@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Modern CSS Animations and Styling</title>
+<style>
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    animation: fadeInDown 1s ease forwards;
+  }
+
+  p.subtitle {
+    font-size: 1.25rem;
+    margin-bottom: 3rem;
+    text-align: center;
+    color: #d1c4e9;
+    animation: fadeInUp 1s ease forwards;
+    animation-delay: 0.5s;
+  }
+
+  /* Button with gradient and hover animation */
+  .btn {
+    background: linear-gradient(45deg, #ff6a00, #ee0979);
+    border: none;
+    border-radius: 50px;
+    color: white;
+    padding: 1rem 3rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(238, 9, 121, 0.6);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    animation: pulse 2s infinite;
+  }
+  .btn:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 6px 20px rgba(255, 106, 0, 0.8);
+  }
+
+  /* Card container */
+  .card-container {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  /* Card styling */
+  .card {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2rem;
+    width: 280px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    backdrop-filter: blur(10px);
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    cursor: pointer;
+    animation: fadeInScale 1s ease forwards;
+  }
+  .card:hover {
+    transform: translateY(-15px) scale(1.05);
+    box-shadow: 0 12px 40px rgba(255, 255, 255, 0.3);
+  }
+
+  .card h2 {
+    margin-bottom: 1rem;
+    font-size: 1.75rem;
+    color: #ff6a00;
+  }
+
+  .card p {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #eee;
+  }
+
+  /* Animations */
+  @keyframes fadeInDown {
+    0% {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow: 0 4px 15px rgba(238, 9, 121, 0.6);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 6px 25px rgba(238, 9, 121, 0.9);
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes fadeInScale {
+    0% {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Floating animated circles background */
+  .background-circles {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .background-circles span {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    animation: floatUp 10s linear infinite;
+    opacity: 0.6;
+  }
+  .background-circles span:nth-child(1) {
+    width: 80px;
+    height: 80px;
+    left: 10%;
+    animation-delay: 0s;
+  }
+  .background-circles span:nth-child(2) {
+    width: 120px;
+    height: 120px;
+    left: 30%;
+    animation-delay: 3s;
+  }
+  .background-circles span:nth-child(3) {
+    width: 60px;
+    height: 60px;
+    left: 50%;
+    animation-delay: 5s;
+  }
+  .background-circles span:nth-child(4) {
+    width: 100px;
+    height: 100px;
+    left: 70%;
+    animation-delay: 7s;
+  }
+  .background-circles span:nth-child(5) {
+    width: 90px;
+    height: 90px;
+    left: 85%;
+    animation-delay: 9s;
+  }
+  @keyframes floatUp {
+    0% {
+      transform: translateY(100vh) scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 0.3;
+    }
+    100% {
+      transform: translateY(-150px) scale(1.2);
+      opacity: 0;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="background-circles">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <h1>Welcome to the Future of Web Design</h1>
+  <p class="subtitle">Experience smooth animations and elegant styling</p>
+  <button class="btn">Get Started</button>
+  <div class="card-container">
+    <div class="card">
+      <h2>Responsive Design</h2>
+      <p>Our layouts adapt seamlessly to any screen size, ensuring a perfect experience on all devices.</p>
+    </div>
+    <div class="card">
+      <h2>Interactive Elements</h2>
+      <p>Buttons and cards respond with smooth animations to engage users and provide feedback.</p>
+    </div>
+    <div class="card">
+      <h2>Modern Aesthetics</h2>
+      <p>Clean lines, vibrant gradients, and subtle shadows create a visually stunning interface.</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interactive Test Form</title>
+<style>
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1rem;
+  }
+  .container {
+    background: rgba(255 255 255 / 0.1);
+    border-radius: 12px;
+    padding: 2rem 3rem;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    backdrop-filter: blur(10px);
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  label {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    display: block;
+  }
+  input[type="text"],
+  input[type="email"] {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: none;
+    font-size: 1rem;
+    outline-offset: 2px;
+    outline-color: #a78bfa;
+    transition: outline-color 0.3s ease;
+    width: 100%;
+  }
+  input[type="text"]:focus,
+  input[type="email"]:focus {
+    outline-color: #d8b4fe;
+  }
+  button {
+    background: linear-gradient(45deg, #ff6a00, #ee0979);
+    border: none;
+    border-radius: 10px;
+    padding: 0.85rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 15px rgba(238, 9, 121, 0.6);
+  }
+  button:hover,
+  button:focus {
+    background: linear-gradient(45deg, #ee0979, #ff6a00);
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(255, 106, 0, 0.8);
+    outline: none;
+  }
+  @media (max-width: 480px) {
+    .container {
+      padding: 1.5rem 2rem;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="container" role="main">
+    <h1>Contact Form</h1>
+    <form id="contactForm" novalidate>
+      <label for="nameInput">Name</label>
+      <input type="text" id="nameInput" name="name" placeholder="Your name" required autocomplete="name" />
+      <label for="emailInput">Email</label>
+      <input type="email" id="emailInput" name="email" placeholder="you@example.com" required autocomplete="email" />
+      <button type="submit" aria-label="Submit contact form">Submit</button>
+    </form>
+  </div>
+<script>
+  document.getElementById('contactForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const name = this.name.value.trim();
+    const email = this.email.value.trim();
+    if (!name || !email) {
+      alert('Please fill in both your name and email.');
+      return;
+    }
+    alert(`Name: ${name}\nEmail: ${email}`);
+  });
+</script>
+</body>
+</html>

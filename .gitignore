@@ -1,2 +1,73 @@
-.aider*
+# 🔐 Security - API Keys and Sensitive Data
 .env
+.env.local
+.env.*.local
+*.key
+*_key
+*_secret
+
+# 🗂️ Aider Files  
+.aider*
+
+# 📊 Logs and Runtime Files
+logs/
+*.log
+*.log.*
+
+# 🗃️ Backup Files
+backup/
+*.bak
+*.backup
+
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 💻 IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 🗂️ OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 📦 Dependencies
+node_modules/
+.npm
+.yarn-integrity
+
+# 🧪 Testing
+.coverage
+.pytest_cache/
+.tox/
+htmlcov/
+
+# 📝 Documentation Build
+docs/_build/
+site/

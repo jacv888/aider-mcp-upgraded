@@ -8,8 +8,13 @@ from dotenv import load_dotenv
 from aider_adapter import Model, Coder, InputOutput
 from aider_mcp_server.atoms.logging import get_logger
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables with MCP aider-mcp as primary source
+load_dotenv()  # Load from current directory (lowest priority)
+load_dotenv(os.path.expanduser("~/.config/aider/.env"))  # Load global config (medium priority)
+load_dotenv("/Users/jacquesv/MCP/aider-mcp/.env", override=True)  # PRIMARY source (highest priority)
+
+# Import strategic model selector
+from strategic_model_selector import get_optimal_model
 
 # Configure logging for this module
 logger = get_logger(__name__)
@@ -209,7 +214,7 @@ def code_with_aider(
     ai_coding_prompt: str,
     relative_editable_files: List[str],
     relative_readonly_files: List[str],
-    model: str,
+    model: str = None,  # Made optional for strategic selection
     working_dir: str = None,
 ) -> str:
     """
@@ -248,9 +253,13 @@ def code_with_aider(
         os.chdir(working_dir)
         logger.info(f"Changed to working directory: {working_dir}")
 
+        # Strategic model selection - use optimal model for the task
+        selected_model = get_optimal_model(ai_coding_prompt, model)
+        logger.info(f"Strategic model selection: '{selected_model}' for prompt: {ai_coding_prompt[:50]}...")
+
         # Configure the model
         logger.info("Configuring AI model...")
-        ai_model = Model(model)
+        ai_model = Model(selected_model)
         logger.info("AI model configured.")
 
         # Create the coder instance

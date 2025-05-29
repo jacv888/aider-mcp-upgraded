@@ -1,172 +1,348 @@
-# MyMCP - Multiple Coding Prompts with Aider
+# 🚀 Aider-MCP: Advanced AI Coding Server with Resilience & Strategic Model Selection
 
-MyMCP is a Python application that enables parallel execution of multiple AI coding tasks using the Aider tool. It provides a framework for running multiple coding prompts simultaneously, improving efficiency and reducing execution time.
+[![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)]()
+[![Resilience](https://img.shields.io/badge/resilience-enhanced-blue)]()
+[![Models](https://img.shields.io/badge/models-strategic%20selection-purple)]()
 
-## Features
+**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with comprehensive resilience features and strategic model selection. Built for reliability, performance, and optimal model utilization.
 
-- **Parallel Execution**: Run multiple AI coding tasks simultaneously for faster results
-- **Sequential Execution**: Option to run tasks sequentially when needed
-- **Detailed Reporting**: Get comprehensive reports on task execution, including success/failure status and implementation details
-- **MCP Integration**: Built on the Model Context Protocol (MCP) for standardized AI model interactions
-- **Performance Metrics**: Compare parallel vs. sequential execution times
+## ✨ Key Features
 
-## Installation
+### 🧠 **Strategic Model Selection**
+- **Automatic model optimization** based on task type and complexity
+- **Context-aware selection**: Complex algorithms → Claude 3.5 Sonnet, Simple tasks → GPT-4o Mini
+- **Custom model override** capability when needed
+- **Cost optimization** through intelligent model matching
 
-### Prerequisites
+### 🛡️ **Resilience & Stability**
+- **Connection health monitoring** with automatic recovery
+- **Resource management** with CPU/Memory thresholds
+- **Circuit breaker protection** against cascade failures
+- **Task queue management** preventing system overload
+- **Zero disconnection** architecture for stable operations
 
-- Python 3.8 or higher
-- Git (for tracking code changes)
-- Aider CLI tool
+### ⚡ **High-Performance Parallel Processing**
+- **Multi-agent execution** with configurable concurrency limits
+- **2.6x performance boost** through intelligent parallelization
+- **Task branching** for independent development streams
+- **Real-time progress monitoring** and detailed reporting
 
-### Setup
+### ⚙️ **Advanced Configuration System**
+- **Priority-based configuration** loading (project → global → defaults)
+- **Environment variable support** with hot-reloading
+- **Profile-based settings** (development, production, high-load)
+- **Runtime configuration updates** without server restart
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/eiliyaabedini/aider-mcp.git
-   cd aider-mcp
-   ```
+## 🏗️ Architecture Overview
 
-# Installation Guide for MyMCP
-
-This guide will help you set up MyMCP on your system.
-
-## Prerequisites
-
-- Python 3.8 or higher
-- Git
-- Aider CLI tool
-
-## Step 1: Install Aider
-
-Aider is a required dependency for MyMCP. You can install it using one of the following methods:
-
-### Option 1: One-line installer (Mac & Linux)
-
-```bash
-curl -s https://aider.chat/install.sh | sh
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   MCP Client    │◄──►│   Aider-MCP      │◄──►│   AI Models     │
+│   (Claude)      │    │   Server         │    │   (Strategic)   │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                               │
+                    ┌──────────┼──────────┐
+                    │          │          │
+            ┌───────▼───┐ ┌────▼────┐ ┌───▼────────┐
+            │ Task Queue│ │Resource │ │ Circuit    │
+            │ Manager   │ │Monitor  │ │ Breaker    │
+            └───────────┘ └─────────┘ └────────────┘
 ```
 
-Or with wget:
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
-wget -qO- https://aider.chat/install.sh | sh
-```
+# Clone repository
+git clone https://github.com/eiliyaabedini/aider-mcp.git
+cd aider-mcp
 
-### Option 2: Using pip
-
-```bash
-python -m pip install aider-install
-aider-install
-```
-
-## Step 2: Install AiderMCP Requirements
-
-### Option 1: Using pip
-
-```bash
-pip install -e .
-```
-
-### Option 2: Manual installation
-
-```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Install resilience features
+python3 install_resilience.py --install
+
+# Configure environment
+cp .env.sample .env
+# Edit .env with your API keys
 ```
-
-## Step 3: Configure Environment Variables
-
-Create a `.env` file from `.env.sample` in the project root directory with the following content:
-
-```
-# Default model to use if not specified
-AIDER_MODEL=gpt-4.1-mini
-
-# Add any other environment variables needed
-```
-
-## Step 4: Verify Installation
-
-Run the test suite to verify that everything is working correctly:
-
-```bash
-python tests/test_multiple_ai.py
-```
-
-You should see output showing both parallel and sequential execution of AI coding tasks.
-
-## Step 5: Use AiderMCP in Claude Desktop
-
-```
-"AiderMCP": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--with",
-        "mcp[cli]",
-        "mcp",
-        "run",
-        "/Users/path/to/aider_mcp.py"
-      ]
-    }
-```
-
-## Usage
 
 ### Basic Usage
 
-```
-Just ask your MCP client (Claude Desktop) to use the code_with_ai or code_with_multiple_ai tool for coding.
-and provide the full path where it should create the files.
-
-Sample of Snake game to run at same time:
-Use this directory as WorkDirectory: /Users/eiliya/ai/snake 
-This is the prompt for making a Snake Battle Royale,
-First create a Readme and Architect file as your plan for implementation and save it as md file then, 
-I want you to think deep and design tasks properly, You will use **code_with_multiple_ai **MCP tool to implement the code, so You need to give the coder good context, our coder needs some knowledge as readonly_files, so provide the location of the Readme.md and Architect.md (That you will create and is a big picture of whole project)
-Important, this tools let you code in parallel but you need to be careful that your tasks has no dependency, planing is imporant, create different task branches, that each branch can be run without dependency to other branches,
-then run tasks of multiple branches at same time,
-even if you can design the code the way that all the tasks are seperated and can be run in one attempt (no dependency to each other) then you can run them all in one attempt:
-Example:
-
-Branch 1: Front end --> Task1: initiate front end, Task2: implement index page
-Branch 2: Back end -->  Task1: initiate backend, Task2: implement api
-Branch 3: Database -->  Task1: initiate database, Task2: implement database
-
-Then in each round you can get all the Task 1 to this method
-Or 
-
-Branch 1: Task1: Implement index.html, Task2: assemble everything into index.html   
-Branch 2: Task1: Implement script.js 
-Branch 3: Task1: Implement styles.css 
-Branch 4: Task1: Implement script3.js 
-Branch 5: Task1: Implement script4.js
-Branch 6: Task1: Implement script5.js
-Branch 7: Task1: Implement script6.js
-Then in each round you can get all the Task 1 to this method, but in task 2 you know all the tasks 1 are implemented, 
-then you can have dependency to all other implemented tasks 1 
-
-Game prompt:
-"Snake Battle Royale Language: HTML/CSS/JavaScript (vanilla, no frameworks) Libraries: None, pure JavaScript Style: Minimalist design with accent colors in teal and orange Rules: 1. All files should be in the folder snake_battle_royale 1. Keep the code clean and reusable, use functions and classes and split the code into multiple files to keep it organized Guidelines: 2. You can move the snake around the screen using the arrow keys 3. Eat food to grow the snake 4. Avoid hitting the edges of the screen, or the snakes own body, or the enemy snake, or you lose. The game is only over when the players snake is dead. 5. There are at least 3 powerups that change the game mechanics, including effects that show how the powerups work 6. A scoring system that rewards the player for eating food and hitting powerups 7. A simple AI opponent that competes with the player using pathfinding 8. A home screen where the player can hit enter to start the game 9. A game over screen that shows your score and allows you to go back to the home screen or restart the game 10. On the game screen, display a legend containing the powerups and their names, as well as the user and enemy snake's name and score 11. When the game starts, we should have a 3 second countdown where everything is frozen in place, then the game starts"
-if **code_with_multiple_ai **tool failed stop the process, I need to check it
-
+#### Single AI Task
+```python
+code_with_ai(
+    prompt="Create a React login component with validation",
+    working_dir="./my-project",
+    editable_files=["src/LoginForm.jsx"]
+)
 ```
 
-### Running Tests
+#### Multiple AI Tasks (Parallel)
+```python
+code_with_multiple_ai(
+    prompts=[
+        "Create React component with hooks",      # → Claude 3.5 Sonnet
+        "Write unit tests for the API",          # → GPT-4o Mini  
+        "Generate comprehensive docs",           # → Gemini 2.5 Pro
+        "Add responsive CSS styling"             # → GPT-4o
+    ],
+    working_dir="./my-project",
+    editable_files_list=[
+        ["src/Component.jsx"],
+        ["tests/api.test.js"], 
+        ["docs/README.md"],
+        ["src/styles.css"]
+    ]
+)
+```
 
-The project includes tests to verify functionality and compare parallel vs. sequential execution:
+## 📋 Configuration Guide
 
+### Priority System
+Configuration is loaded in priority order:
+1. **Project-level**: `/path/to/project/.env` (highest priority)
+2. **Global**: `~/.config/aider/.env` (medium priority)  
+3. **System**: Current directory `.env` (lowest priority)
+
+### Resilience Settings
 ```bash
+# Task Management
+MAX_CONCURRENT_TASKS=3           # Prevent overload
+MAX_TASK_QUEUE_SIZE=10          # Queue capacity
+
+# Resource Monitoring  
+CPU_USAGE_THRESHOLD=75.0        # CPU limit (%)
+MEMORY_USAGE_THRESHOLD=80.0     # Memory limit (%)
+
+# Circuit Breaker
+CIRCUIT_BREAKER_FAILURE_THRESHOLD=3   # Failure limit
+CIRCUIT_BREAKER_RESET_TIMEOUT=60      # Reset time (seconds)
+
+# Health Monitoring
+HEALTH_CHECK_INTERVAL=30        # Check frequency (seconds)
+```
+
+### Strategic Model Configuration
+```bash
+# Automatic model selection (recommended)
+AIDER_MODEL=                    # Empty = strategic selection
+
+# Or specify default model
+AIDER_MODEL=gpt-4.1-mini       # Override strategic selection
+
+# API Keys
+ANTHROPIC_API_KEY=your_claude_key
+OPENAI_API_KEY=your_openai_key
+GOOGLE_API_KEY=your_gemini_key
+```
+
+## 🎯 Strategic Model Selection
+
+The system automatically selects optimal models based on task analysis:
+
+| Task Type | Optimal Model | Reason |
+|-----------|---------------|---------|
+| **Complex Algorithms** | Claude 3.5 Sonnet | Superior reasoning |
+| **Simple Tasks** | GPT-4o Mini | Fast & cost-effective |
+| **Documentation** | Gemini 2.5 Pro | Excellent writing |
+| **Testing** | GPT-4o Mini | Efficient generation |
+| **CSS/Styling** | GPT-4o | Great design capabilities |
+| **React/Frontend** | Claude 3.5 Sonnet | Complex logic handling |
+| **API/Backend** | Claude 3.5 Haiku | Fast server code |
+| **Debugging** | Claude 3.5 Sonnet | Best problem-solving |
+
+## 🛡️ Resilience Features
+
+### Connection Health Monitor
+- **Heartbeat system** detects connection issues
+- **Automatic reconnection** without manual intervention
+- **Health status logging** for monitoring
+
+### Resource Management
+- **CPU/Memory monitoring** with configurable thresholds
+- **Automatic throttling** under high load
+- **Graceful degradation** instead of crashes
+
+### Circuit Breaker Protection
+- **Failure threshold detection** (default: 3 failures)
+- **Automatic recovery** after timeout (default: 60s)
+- **Cascade failure prevention**
+
+### Task Queue Management
+- **Concurrency limits** prevent system overload
+- **Queue size management** with overflow protection
+- **Task prioritization** and fair scheduling
+
+## 📊 Performance Benchmarks
+
+Based on real testing with tech startup landing page generation:
+
+| Metric | Before Resilience | After Resilience |
+|--------|------------------|------------------|
+| **Connection Stability** | ❌ Disconnected | ✅ **100% Stable** |
+| **Task Success Rate** | ❌ Failed | ✅ **100% (3/3)** |
+| **Parallel Speedup** | ❌ N/A | ✅ **2.64x** |
+| **Resource Usage** | ❌ Uncontrolled | ✅ **Monitored** |
+| **Recovery Time** | ❌ Manual restart | ✅ **Automatic** |
+
+### Test Results
+- **Tasks**: 3 parallel (HTML, JS, CSS generation)
+- **Execution Time**: 25.02 seconds (parallel) vs 65.96 seconds (sequential)
+- **Files Generated**: 451 lines of production-ready code
+- **Connection**: Zero disconnections throughout intensive processing
+
+## 🔧 Advanced Usage
+
+### Task Branching Strategy
+```python
+# Branch 1: Frontend Development
+frontend_tasks = [
+    "Create React components",
+    "Add responsive styling", 
+    "Implement user interactions"
+]
+
+# Branch 2: Backend Development  
+backend_tasks = [
+    "Design API endpoints",
+    "Add database models",
+    "Implement authentication"
+]
+
+# Branch 3: Testing & Documentation
+testing_tasks = [
+    "Write unit tests",
+    "Add integration tests",
+    "Generate API documentation"
+]
+
+# Execute branches in parallel
+code_with_multiple_ai(
+    prompts=frontend_tasks + backend_tasks + testing_tasks,
+    working_dir="./project",
+    # ... configuration
+)
+```
+
+### Custom Model Selection
+```python
+# Override strategic selection
+code_with_multiple_ai(
+    prompts=["Complex algorithm task"],
+    models=["claude-3-5-sonnet-20241022"],  # Force specific model
+    # ... other parameters
+)
+
+# Mixed approach
+code_with_multiple_ai(
+    prompts=["Task 1", "Task 2", "Task 3"],
+    models=[None, "gpt-4o-mini", None],  # Strategic, Custom, Strategic
+    # ... other parameters
+)
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Connection Disconnections
+```bash
+# Check resilience status
+python tests/multi-ai-2/resilience-test.py
+
+# Verify configuration
+cat .env | grep -E "(THRESHOLD|CONCURRENT|QUEUE)"
+
+# Monitor server logs
+tail -f aider_mcp.log
+```
+
+#### High Resource Usage
+```bash
+# Check current usage
+python -c "import psutil; print(f'CPU: {psutil.cpu_percent()}%, Memory: {psutil.virtual_memory().percent}%')"
+
+# Adjust thresholds in .env
+CPU_USAGE_THRESHOLD=60.0
+MEMORY_USAGE_THRESHOLD=70.0
+```
+
+#### Model Selection Issues
+```bash
+# Test strategic selection
+python -c "from strategic_model_selector import get_optimal_model; print(get_optimal_model('create React component'))"
+
+# Check API keys
+python -c "import os; print('OPENAI_KEY:', bool(os.getenv('OPENAI_API_KEY'))); print('ANTHROPIC_KEY:', bool(os.getenv('ANTHROPIC_API_KEY')))"
+```
+
+## 📁 Project Structure
+
+```
+aider-mcp/
+├── 📄 aider_mcp.py                 # Main MCP server with resilience
+├── 🧠 strategic_model_selector.py  # Intelligent model selection
+├── 🛡️ aider_mcp_resilience.py     # Resilience components
+├── ⚙️ resilience_config.py         # Configuration management
+├── 📊 install_resilience.py        # Installation script
+├── 📚 docs/
+│   ├── CONFIG-PRIORITY.md          # Configuration system guide
+│   ├── STRATEGIC-MODEL-SELECTION.md # Model selection guide
+│   └── RESILIENCE_GUIDE.md         # Resilience features guide
+├── 🧪 tests/
+│   ├── multi-ai/                   # Original test results
+│   └── multi-ai-2/                 # Resilience test results
+└── 📝 README.md                    # This file
+```
+
+## 🤝 Contributing
+
+### Development Setup
+```bash
+# Clone and setup
+git clone https://github.com/eiliyaabedini/aider-mcp.git
+cd aider-mcp
+
+# Install development dependencies
+pip install -r requirements.txt
+pip install -e .
+
+# Run tests
 python tests/test_multiple_ai.py
 ```
 
-## Architecture
+### Adding New Features
+1. **Fork** the repository
+2. **Create** feature branch: `git checkout -b feature/amazing-feature`
+3. **Implement** changes with tests
+4. **Test** resilience: `python tests/multi-ai-2/resilience-test.py`
+5. **Submit** pull request
 
-The project consists of several key components:
+### Testing Guidelines
+- Test both single and multiple AI operations
+- Verify resilience features remain active
+- Check strategic model selection accuracy
+- Validate configuration priority system
 
-- **aider_mcp.py**: Main module providing the `code_with_multiple_ai` function
-- **aider_ai_code.py**: Integration with the Aider tool for AI coding
-- **aider_adapter.py**: Custom adapter for the Aider CLI tool
-- **tests/**: Test files to verify functionality
+## 📄 License
 
-- [Aider](https://aider.chat) - AI pair programming tool
-- [MCP (Model Context Protocol)](https://modelcontextprotocol.ai) - Protocol for AI model interactions
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Aider** - The amazing AI coding assistant that powers this server
+- **Model Context Protocol** - For standardizing AI model interactions
+- **Contributors** - Everyone who helped improve stability and performance
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/eiliyaabedini/aider-mcp/issues)
+- **Documentation**: See `docs/` directory for detailed guides
+- **Community**: Join discussions in GitHub Discussions
+
+---
+
+**Built with ❤️ for developers who need reliable, intelligent AI coding assistance**

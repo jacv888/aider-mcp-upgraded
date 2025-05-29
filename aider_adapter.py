@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Path to the aider CLI tool
-AIDER_PATH = "/Users/eiliya/.local/share/uv/tools/aider-chat/bin/aider"
+AIDER_PATH = "/opt/homebrew/bin/aider"
 
 class Model:
     """
