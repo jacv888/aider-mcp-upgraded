@@ -1,3 +1,0 @@
-Current date and time: 2025-05-29 00:00:00
-Configuration test successful
-Primary config source: /Users/jacquesv/MCP/aider-mcp/.env
