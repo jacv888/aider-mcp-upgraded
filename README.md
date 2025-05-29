@@ -55,7 +55,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/eiliyaabedini/aider-mcp.git
+git clone https://github.com/jacv888/aider-mcp.git
 cd aider-mcp
 
 # Install dependencies
@@ -303,7 +303,7 @@ aider-mcp/
 ### Development Setup
 ```bash
 # Clone and setup
-git clone https://github.com/eiliyaabedini/aider-mcp.git
+git clone https://github.com/jacv888/aider-mcp.git
 cd aider-mcp
 
 # Install development dependencies
@@ -339,7 +339,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/eiliyaabedini/aider-mcp/issues)
+- **Issues**: [GitHub Issues](https://github.com/jacv888/aider-mcp/issues)
 - **Documentation**: See `docs/` directory for detailed guides
 - **Community**: Join discussions in GitHub Discussions
 

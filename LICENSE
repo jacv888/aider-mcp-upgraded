@@ -1,0 +1,49 @@
+MIT License
+
+Copyright (c) 2025 Jacques Venter (jacv888)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Third-Party Licenses
+
+This project uses the following third-party libraries:
+
+### Aider
+- **License**: Apache License 2.0
+- **Repository**: https://github.com/aider-ai/aider
+- **Usage**: Core AI coding functionality
+
+### Model Context Protocol (MCP)
+- **License**: MIT License  
+- **Repository**: https://github.com/modelcontextprotocol/python-sdk
+- **Usage**: MCP server implementation
+
+### psutil
+- **License**: BSD License
+- **Repository**: https://github.com/giampaolo/psutil
+- **Usage**: System resource monitoring
+
+### python-dotenv
+- **License**: BSD License
+- **Repository**: https://github.com/theskumar/python-dotenv  
+- **Usage**: Environment variable management
+
+All third-party licenses are compatible with the MIT License of this project.
