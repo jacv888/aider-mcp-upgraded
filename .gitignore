@@ -1,3 +1,12 @@
+# Git Ignore File
+
+# 📂 Project Files
+backup/
+docs/
+logs/
+reference/
+tests/
+
 # 🔐 Security - API Keys and Sensitive Data
 .env
 .env.local
@@ -6,7 +15,7 @@
 *_key
 *_secret
 
-# 🗂️ Aider Files  
+# 🗂️ Aider Files
 .aider*
 
 # 📊 Logs and Runtime Files
