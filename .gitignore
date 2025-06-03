@@ -1,7 +1,6 @@
 # Git Ignore File
 
 # 📂 Project Files
-backup/
 docs/
 logs/
 reference/
