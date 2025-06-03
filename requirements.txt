@@ -16,11 +16,8 @@ psutil>=5.8.0
 # Testing dependencies
 pytest>=7.0.0
 
-# Logging
-logging>=0.4.9
+# For subprocess management (built into Python 3.2+)
+# concurrent-futures>=3.0.5  # Not needed for Python 3.2+
 
-# For subprocess management
-concurrent-futures>=3.0.5
-
-# For environment variable management
-python-dotenv>=1.0.0
+# For environment variable management (already listed above)
+# python-dotenv>=1.0.0  # Duplicate removed

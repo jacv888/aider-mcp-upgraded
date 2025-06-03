@@ -64,7 +64,7 @@ claude_config = f'''    "aider-mcp": {{
       "command": "/bin/sh",
       "args": [
         "-c",
-        "cd {mcp_server_root} && PYTHONPATH={mcp_server_root} {uv_path} run --with mcp[cli] mcp run {mcp_entry_point}"
+        "cd {mcp_server_root} && PYTHONPATH={mcp_server_root} {uv_path} run --with mcp[cli] --with python-dotenv --with psutil --with tiktoken --with httpx mcp run {mcp_entry_point}"
       ]
     }}'''
 
