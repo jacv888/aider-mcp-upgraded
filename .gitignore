@@ -1,6 +1,7 @@
 # Git Ignore File
 
 # 📂 Project Files
+*.code-workspace
 docs/
 logs/
 reference/
