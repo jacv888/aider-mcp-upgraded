@@ -12,8 +12,8 @@ Thank you for your interest in contributing to Aider-MCP! We welcome contributio
 ### Development Setup
 ```bash
 # Fork and clone the repository
-git clone https://github.com/jacv888/aider-mcp.git
-cd aider-mcp
+git clone https://github.com/jacv888/aider-mcp-upgraded.git
+cd aider-mcp-upgraded
 
 # Install dependencies
 pip install -r requirements.txt

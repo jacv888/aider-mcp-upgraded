@@ -3,9 +3,15 @@ mcp>=0.1.0
 python-dotenv>=1.0.0
 httpx>=0.24.0
 
+# Phase 2: Cost management dependencies
+tiktoken>=0.5.0
+
 # For Aider integration
 # Note: Aider is typically installed separately via its installer
 # curl -s https://aider.chat/install.sh | sh
+
+# System monitoring (for resilience features)
+psutil>=5.8.0
 
 # Testing dependencies
 pytest>=7.0.0

@@ -5,6 +5,8 @@ docs/
 logs/
 reference/
 tests/
+prompts/
+upgrades/
 
 # 🔐 Security - API Keys and Sensitive Data
 .env
@@ -13,6 +15,10 @@ tests/
 *.key
 *_key
 *_secret
+
+# 💰 Cost Data - Keep private
+costs/
+*.csv
 
 # 🗂️ Aider Files
 .aider*

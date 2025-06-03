@@ -1,0 +1,1 @@
+# Aider-MCP Application Package

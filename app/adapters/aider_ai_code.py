@@ -5,16 +5,16 @@ import os.path
 import subprocess
 from dotenv import load_dotenv
 # Import our custom implementation instead of the actual aider package
-from aider_adapter import Model, Coder, InputOutput
+from app.adapters.aider_adapter import Model, Coder, InputOutput
 from aider_mcp_server.atoms.logging import get_logger
 
 # Load environment variables with MCP aider-mcp as primary source
 load_dotenv()  # Load from current directory (lowest priority)
 load_dotenv(os.path.expanduser("~/.config/aider/.env"))  # Load global config (medium priority)
-load_dotenv("/Users/jacquesv/MCP/aider-mcp/.env", override=True)  # PRIMARY source (highest priority)
+load_dotenv("/Users/jacquesv/mcp/aider-mcp/.env", override=True)  # PRIMARY source (highest priority)
 
 # Import strategic model selector
-from strategic_model_selector import get_optimal_model
+from app.models.strategic_model_selector import get_optimal_model
 
 # Configure logging for this module
 logger = get_logger(__name__)

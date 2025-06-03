@@ -152,8 +152,8 @@ def main():
         print("🎉 ALL CHECKS PASSED!")
         print("✅ Repository is ready for GitHub publication")
         print("\n🚀 Next steps:")
-        print("1. Create repository at https://github.com/jacv888/aider-mcp")
-        print("2. git remote add origin https://github.com/jacv888/aider-mcp.git")
+        print("1. Create repository at https://github.com/jacv888/aider-mcp-upgraded")
+        print("2. git remote add origin https://github.com/jacv888/aider-mcp-upgraded.git")
         print("3. git add . && git commit -m 'Initial release'")
         print("4. git push -u origin main")
     else:

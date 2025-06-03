@@ -1,7 +1,9 @@
 from mcp.server.fastmcp import FastMCP
 import os
+import json
+import datetime
 from typing import List, Optional
-from aider_ai_code import code_with_aider
+from app.adapters.aider_ai_code import code_with_aider
 from dotenv import load_dotenv
 
 # Resilience imports
@@ -11,18 +13,15 @@ import time
 import logging
 from queue import Queue, Full, Empty
 
-# Load environment variables from multiple locations
-# Priority order: MCP aider-mcp directory is PRIMARY source, then fallbacks
-load_dotenv()  # Load from current directory (lowest priority)
-load_dotenv(
-    os.path.expanduser("~/.config/aider/.env")
-)  # Load global config (medium priority)
-load_dotenv(
-    "/Users/jacquesv/MCP/aider-mcp/.env", override=True
-)  # PRIMARY source (highest priority)
+# Load environment variables from multiple locations using ModelRegistry
+# The ModelRegistry handles proper path resolution and priority loading
+from app.models.model_registry import model_registry
 
 # Import strategic model selector
-from strategic_model_selector import get_optimal_model
+from app.models.strategic_model_selector import get_optimal_model
+
+# Import cost management
+from app.cost.cost_manager import cost_manager, estimate_cost, check_budget, record_cost
 
 FALL_BACK_MODEL = "gpt-4.1-mini"
 
@@ -213,14 +212,14 @@ def code_with_ai(
     Use Aider to perform AI coding tasks with strategic model selection.
 
     The system will automatically select the optimal model based on your prompt:
-    - Complex algorithms: Claude Sonnet 4 (best reasoning)
-    - Simple tasks: GPT-4.1 Mini (fast & cheap)
-    - Documentation: Gemini 2.5 Pro (excellent writing)
-    - Debugging: Claude 3.5 Sonnet (best problem-solving)
-    - CSS/Styling: GPT-4o (great design capabilities)
-    - React/Frontend: Claude 3.5 Sonnet (best for complex logic)
-    - API/Backend: Claude 3.5 Haiku (fast for server code)
-    - Testing: GPT-4o Mini (efficient for test generation)
+    - Complex algorithms: Gemini 2.5 Pro (best reasoning)
+    - Simple tasks: GPT-4.1 Nano (fastest & cheapest)
+    - Documentation: Gemini 2.5 Flash (excellent writing)
+    - Debugging: GPT-4.1 Mini (best problem-solving)
+    - CSS/Styling: Gemini 2.5 Flash (great design capabilities)
+    - React/Frontend: GPT-4.1 Mini (best for complex logic)
+    - API/Backend: Gemini 2.5 Flash (fast server code)
+    - Testing: GPT-4.1 Mini (efficient for test generation)
     - General tasks: GPT-4.1 Mini (balanced performance)
 
     You can override model selection by specifying the 'model' parameter.
@@ -246,14 +245,108 @@ def code_with_ai(
         if model is None:
             model = get_optimal_model(prompt)
 
+        # Phase 2: Cost Pre-flight Check
+        if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true":
+            try:
+                # Read file contents for cost estimation
+                files_content = []
+                for file_path in editable_files + (readonly_files or []):
+                    full_path = os.path.join(working_dir, file_path)
+                    if os.path.exists(full_path):
+                        try:
+                            with open(full_path, 'r', encoding='utf-8') as f:
+                                files_content.append(f.read())
+                        except Exception:
+                            # Skip files that can't be read
+                            pass
+                
+                # Estimate cost before execution
+                cost_estimate = estimate_cost(prompt, files_content, model, "code_generation")
+                
+                # Check budget limits
+                budget_ok, budget_message = check_budget(cost_estimate.total_cost)
+                
+                if not budget_ok:
+                    # Budget exceeded - return error
+                    error_response = {
+                        "success": False,
+                        "error": f"Task aborted: {budget_message}",
+                        "cost_estimate": {
+                            "total_cost": cost_estimate.total_cost,
+                            "input_tokens": cost_estimate.input_tokens,
+                            "estimated_output_tokens": cost_estimate.estimated_output_tokens,
+                            "model": model
+                        },
+                        "details": "Task was aborted to prevent budget overrun."
+                    }
+                    return json.dumps(error_response)
+                
+                # Log cost estimate only if logging enabled
+                if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
+                    if budget_message:  # Warning message
+                        logger.warning(f"Cost warning: {budget_message}")
+                    
+                    logger.info(f"Task cost estimate: ${cost_estimate.total_cost:.4f} "
+                               f"({cost_estimate.input_tokens}+{cost_estimate.estimated_output_tokens} tokens, {model})")
+                
+            except Exception as e:
+                if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
+                    logger.warning(f"Cost estimation failed: {e}")
+                # Continue without cost tracking if estimation fails
+
+        # Execute the task
+        import time
+        start_time = time.time()
+        
         # Call the Aider integration function
-        return code_with_aider(
+        result = code_with_aider(
             ai_coding_prompt=prompt,
             relative_editable_files=editable_files,
             relative_readonly_files=readonly_files,
             model=model,
             working_dir=working_dir,
         )
+        
+        # Phase 2: Record actual cost (if cost tracking enabled)
+        if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true":
+            try:
+                duration = time.time() - start_time
+                
+                # Parse result to extract token usage (if available)
+                # Note: This is a simplified version - actual token counting would need
+                # integration with the AI provider's response
+                import uuid
+                task_id = str(uuid.uuid4())[:8]
+                
+                # Estimate actual tokens used (this could be improved with real API response data)
+                estimated_input = cost_estimate.input_tokens if 'cost_estimate' in locals() else 1000
+                estimated_output = max(500, len(str(result)) // 4)  # Rough estimate from result length
+                
+                # Record the cost
+                cost_result = record_cost(task_id, estimated_input, estimated_output, model, duration)
+                
+                # Add cost info to result if it's JSON
+                try:
+                    import json
+                    result_data = json.loads(result) if isinstance(result, str) else result
+                    if isinstance(result_data, dict):
+                        result_data["cost_info"] = {
+                            "total_cost": cost_result.total_cost,
+                            "input_tokens": cost_result.input_tokens,
+                            "output_tokens": cost_result.output_tokens,
+                            "model": model,
+                            "duration_seconds": duration
+                        }
+                        result = json.dumps(result_data)
+                except Exception:
+                    # If result parsing fails, just continue with original result
+                    pass
+                    
+            except Exception as e:
+                if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
+                    logger.warning(f"Cost recording failed: {e}")
+        
+        return result
     except Exception as e:
         # Log the error
         logger.error(f"Error in code_with_ai: {str(e)}")
@@ -283,22 +376,22 @@ def code_with_multiple_ai(
 
     🧠 STRATEGIC MODEL SELECTION:
     Each task automatically gets the optimal model based on its prompt:
-    - Complex algorithms: Claude 3.5 Sonnet (best reasoning)
-    - Simple tasks: GPT-4o Mini (fast & cheap)
-    - Documentation: Gemini 2.5 Pro (excellent writing)
-    - Testing: GPT-4o Mini (efficient for test generation)
-    - CSS/Styling: GPT-4o (great design capabilities)
-    - React/Frontend: Claude 3.5 Sonnet (best for complex logic)
-    - API/Backend: Claude 3.5 Haiku (fast for server code)
-    - Debugging: Claude 3.5 Sonnet (best problem-solving)
+    - Complex algorithms: Gemini 2.5 Pro (best reasoning)
+    - Simple tasks: GPT-4.1 Nano (fastest & cheapest)
+    - Documentation: Gemini 2.5 Flash (excellent writing)
+    - Testing: GPT-4.1 Mini (efficient for test generation)
+    - CSS/Styling: Gemini 2.5 Flash (great design capabilities)
+    - React/Frontend: GPT-4.1 Mini (best for complex logic)
+    - API/Backend: Gemini 2.5 Flash (fast for server code)
+    - Debugging: GPT-4.1 Mini (best problem-solving)
 
     💫 EXAMPLE USAGE WITH STRATEGIC SELECTION:
     code_with_multiple_ai(
         prompts=[
-            "Create complex React component with state management",  # → Claude 3.5 Sonnet
-            "Write unit tests for the API",                         # → GPT-4o Mini
-            "Generate comprehensive documentation",                  # → Gemini 2.5 Pro
-            "Add CSS animations and styling"                        # → GPT-4o
+            "Create complex React component with state management",  # → GPT-4.1 Mini
+            "Write unit tests for the API",                         # → GPT-4.1 Mini
+            "Generate comprehensive documentation",                  # → Gemini 2.5 Flash
+            "Add CSS animations and styling"                        # → Gemini 2.5 Flash
         ],
         # models=None,  # Let system choose optimal models
         working_dir="./my-project"
@@ -668,6 +761,246 @@ def code_with_multiple_ai(
             "details": "The server encountered a critical error but remained running.",
         }
         return json.dumps(error_response, indent=4)
+
+
+# 💰 Phase 2: Cost Management Tools
+
+@mcp.tool()
+def get_cost_summary(
+    days: int = 7
+) -> str:
+    """
+    Get cost summary and analytics for specified period.
+    
+    Args:
+        days: Number of days to include in summary (default: 7)
+        
+    Returns:
+        JSON string with cost summary including total cost, task count, 
+        average cost per task, and breakdown by model
+    """
+    try:
+        summary = cost_manager.get_cost_summary(days)
+        
+        # Add human-readable summary
+        summary["human_summary"] = {
+            "period": f"Last {days} days",
+            "total_spent": f"${summary['total_cost']:.4f}",
+            "average_per_task": f"${summary['average_cost']:.4f}" if summary['task_count'] > 0 else "$0.00",
+            "total_tokens": f"{summary['total_tokens']:,}",
+            "tasks_completed": summary['task_count']
+        }
+        
+        return json.dumps(summary, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error getting cost summary: {e}")
+        error_response = {
+            "success": False,
+            "error": f"Failed to get cost summary: {str(e)}",
+            "error_type": type(e).__name__
+        }
+        return json.dumps(error_response, indent=2)
+
+
+@mcp.tool()
+def estimate_task_cost(
+    prompt: str,
+    file_paths: List[str] = None,
+    model: str = None
+) -> str:
+    """
+    Estimate cost for a task before execution.
+    
+    Args:
+        prompt: The task prompt to estimate cost for
+        file_paths: Optional list of file paths to include in cost calculation
+        model: Optional specific model to use (defaults to strategic selection)
+        
+    Returns:
+        JSON string with cost estimate including token counts and pricing breakdown
+    """
+    try:
+        if file_paths is None:
+            file_paths = []
+            
+        if model is None:
+            model = get_optimal_model(prompt)
+        
+        # Read file contents if paths provided
+        files_content = []
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        files_content.append(f.read())
+                except Exception:
+                    logger.warning(f"Could not read file: {file_path}")
+        
+        # Get cost estimate
+        estimate = estimate_cost(prompt, files_content, model, "code_generation")
+        
+        # Check budget
+        budget_ok, budget_message = check_budget(estimate.total_cost)
+        
+        result = {
+            "success": True,
+            "cost_estimate": {
+                "total_cost": estimate.total_cost,
+                "input_cost": estimate.input_cost,
+                "estimated_output_cost": estimate.estimated_output_cost,
+                "input_tokens": estimate.input_tokens,
+                "estimated_output_tokens": estimate.estimated_output_tokens,
+                "total_tokens": estimate.total_tokens,
+                "model": estimate.model
+            },
+            "budget_check": {
+                "within_budget": budget_ok,
+                "message": budget_message if budget_message else "Cost is within budget limits"
+            },
+            "human_readable": {
+                "estimated_cost": f"${estimate.total_cost:.4f}",
+                "model_used": model,
+                "token_breakdown": f"{estimate.input_tokens:,} input + ~{estimate.estimated_output_tokens:,} output = {estimate.total_tokens:,} total tokens"
+            }
+        }
+        
+        return json.dumps(result, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error estimating task cost: {e}")
+        error_response = {
+            "success": False,
+            "error": f"Failed to estimate cost: {str(e)}",
+            "error_type": type(e).__name__
+        }
+        return json.dumps(error_response, indent=2)
+
+
+@mcp.tool()
+def get_budget_status() -> str:
+    """
+    Get current budget configuration and status.
+    
+    Returns:
+        JSON string with budget limits, current usage, and remaining budget
+    """
+    try:
+        # Get current budget limits
+        budget_limits = cost_manager.budget_limits
+        
+        # Get usage for different periods
+        daily_summary = cost_manager.get_cost_summary(1)
+        monthly_summary = cost_manager.get_cost_summary(30)
+        
+        result = {
+            "success": True,
+            "budget_limits": {
+                "max_cost_per_task": f"${budget_limits['max_cost_per_task']:.2f}",
+                "max_daily_cost": f"${budget_limits['max_daily_cost']:.2f}",
+                "max_monthly_cost": f"${budget_limits['max_monthly_cost']:.2f}",
+                "warning_threshold": f"${budget_limits['warning_threshold']:.2f}"
+            },
+            "current_usage": {
+                "today": f"${daily_summary['total_cost']:.4f}",
+                "this_month": f"${monthly_summary['total_cost']:.4f}",
+                "tasks_today": daily_summary['task_count'],
+                "tasks_this_month": monthly_summary['task_count']
+            },
+            "remaining_budget": {
+                "daily": f"${max(0, budget_limits['max_daily_cost'] - daily_summary['total_cost']):.2f}",
+                "monthly": f"${max(0, budget_limits['max_monthly_cost'] - monthly_summary['total_cost']):.2f}"
+            },
+            "status": {
+                "daily_usage_percent": (daily_summary['total_cost'] / budget_limits['max_daily_cost'] * 100) if budget_limits['max_daily_cost'] > 0 else 0,
+                "monthly_usage_percent": (monthly_summary['total_cost'] / budget_limits['max_monthly_cost'] * 100) if budget_limits['max_monthly_cost'] > 0 else 0
+            }
+        }
+        
+        return json.dumps(result, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error getting budget status: {e}")
+        error_response = {
+            "success": False,
+            "error": f"Failed to get budget status: {str(e)}",
+            "error_type": type(e).__name__
+        }
+        return json.dumps(error_response, indent=2)
+
+
+@mcp.tool()
+def export_cost_report(
+    days: int = 30,
+    format: str = "json"
+) -> str:
+    """
+    Export detailed cost report for analysis.
+    
+    Args:
+        days: Number of days to include in report (default: 30)
+        format: Export format - "json", "summary", or "csv" (default: json)
+        
+    Returns:
+        Detailed cost report. CSV format creates file in /costs directory.
+    """
+    try:
+        if format == "summary":
+            # Human-readable summary format
+            summary = cost_manager.get_cost_summary(days)
+            
+            report_lines = [
+                f"📊 Cost Report - Last {days} Days",
+                "=" * 40,
+                f"Total Spent: ${summary['total_cost']:.4f}",
+                f"Tasks Completed: {summary['task_count']}",
+                f"Average per Task: ${summary['average_cost']:.4f}" if summary['task_count'] > 0 else "Average per Task: $0.00",
+                f"Total Tokens: {summary['total_tokens']:,}",
+                "",
+                "📈 Cost by Model:",
+            ]
+            
+            for model, stats in summary.get('cost_by_model', {}).items():
+                report_lines.append(f"  {model}: ${stats['total_cost']:.4f} ({stats['task_count']} tasks)")
+            
+            return "\n".join(report_lines)
+        elif format == "csv":
+            # Export to CSV file - ONLY created on request
+            try:
+                from app.cost.cost_storage import cost_storage
+                
+                # Filter costs by days
+                from datetime import timedelta
+                cutoff_date = datetime.datetime.now() - timedelta(days=days)
+                filtered_costs = [c for c in cost_manager.cost_history if c.timestamp >= cutoff_date]
+                
+                output_file = cost_storage.export_to_csv(filtered_costs)
+                
+                return json.dumps({
+                    "success": True,
+                    "message": f"Cost data exported to CSV",
+                    "file": str(output_file),
+                    "records": len(filtered_costs),
+                    "period_days": days,
+                    "note": "CSV files are saved in /costs directory"
+                }, indent=2)
+            except Exception as e:
+                return json.dumps({
+                    "success": False,
+                    "error": f"CSV export failed: {str(e)}"
+                }, indent=2)
+        else:
+            # Full JSON export
+            return cost_manager.export_cost_report(days)
+            
+    except Exception as e:
+        logger.error(f"Error exporting cost report: {e}")
+        error_response = {
+            "success": False,
+            "error": f"Failed to export cost report: {str(e)}",
+            "error_type": type(e).__name__
+        }
+        return json.dumps(error_response, indent=2)
 
 
 # Run the server if this file is executed directly
