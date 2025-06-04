@@ -2,7 +2,7 @@ import re
 import os
 from typing import Dict, List, Optional
 from app.models.model_registry import model_registry, get_model_for_task
-from aider_mcp_server.atoms.logging import get_logger
+from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 

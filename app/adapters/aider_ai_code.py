@@ -6,7 +6,7 @@ import subprocess
 from dotenv import load_dotenv
 # Import our custom implementation instead of the actual aider package
 from app.adapters.aider_adapter import Model, Coder, InputOutput
-from aider_mcp_server.atoms.logging import get_logger
+from app.core.logging import get_logger
 
 # Load environment variables with MCP aider-mcp as primary source
 load_dotenv()  # Load from current directory (lowest priority)

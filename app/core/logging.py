@@ -2,13 +2,13 @@ import logging
 
 def get_logger(name):
     """
-    Simple replacement for aider_mcp_server.atoms.logging's get_logger function.
+    Get a configured logger instance with consistent formatting.
     
     Args:
-        name: The name of the logger
+        name: The name of the logger (typically __name__)
         
     Returns:
-        A configured logger instance
+        A configured logger instance with standard formatting
     """
     logger = logging.getLogger(name)
     if not logger.handlers:
