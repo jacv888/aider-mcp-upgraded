@@ -15,8 +15,8 @@ class CostStorage:
     
     def __init__(self, storage_file: str = None):
         if storage_file is None:
-            # Store in project costs directory
-            project_root = Path(__file__).parent
+            # Store in project root costs directory
+            project_root = Path(__file__).parent.parent.parent  # Go up to actual project root
             costs_dir = project_root / "costs"
             costs_dir.mkdir(exist_ok=True)
             
@@ -102,13 +102,14 @@ class CostStorage:
                     'input_tokens': result.input_tokens,
                     'output_tokens': result.output_tokens,
                     'total_tokens': result.total_tokens,
-                    'input_cost': result.input_cost,
-                    'output_cost': result.output_cost,
-                    'total_cost': result.total_cost,
+                    'input_cost': round(result.input_cost, 8),  # Round to avoid scientific notation
+                    'output_cost': round(result.output_cost, 8),
+                    'total_cost': round(result.total_cost, 8),
                     'model': result.model,
                     'duration_seconds': result.duration_seconds,
                     'timestamp': result.timestamp.isoformat(),
-                    'task_id': result.task_id
+                    'task_id': result.task_id,
+                    'task_name': getattr(result, 'task_name', 'Unnamed Task')  # Backward compatibility
                 })
             
             # Write to file with backup
@@ -139,7 +140,7 @@ class CostStorage:
             import csv
             with open(output_file, 'w', newline='') as csvfile:
                 fieldnames = [
-                    'timestamp', 'task_id', 'model', 'input_tokens', 'output_tokens',
+                    'timestamp', 'task_id', 'task_name', 'model', 'input_tokens', 'output_tokens',
                     'total_tokens', 'input_cost', 'output_cost', 'total_cost', 
                     'duration_seconds'
                 ]
@@ -150,13 +151,14 @@ class CostStorage:
                     writer.writerow({
                         'timestamp': result.timestamp.isoformat(),
                         'task_id': result.task_id,
+                        'task_name': getattr(result, 'task_name', 'Unnamed Task'),  # Backward compatibility
                         'model': result.model,
                         'input_tokens': result.input_tokens,
                         'output_tokens': result.output_tokens,
                         'total_tokens': result.total_tokens,
-                        'input_cost': result.input_cost,
-                        'output_cost': result.output_cost,
-                        'total_cost': result.total_cost,
+                        'input_cost': round(result.input_cost, 8),  # Round to avoid scientific notation
+                        'output_cost': round(result.output_cost, 8),
+                        'total_cost': round(result.total_cost, 8),
                         'duration_seconds': result.duration_seconds
                     })
             

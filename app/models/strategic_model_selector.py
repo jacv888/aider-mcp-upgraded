@@ -1,8 +1,9 @@
 import re
 import os
+import logging
 from typing import Dict, List, Optional
 from app.models.model_registry import model_registry, get_model_for_task
-from app.core.logging import get_logger
+from app.core.logging import get_logger, log_structured
 
 logger = get_logger(__name__)
 
@@ -54,7 +55,10 @@ class StrategicModelSelector:
         if scores:
             best_category = max(scores.keys(), key=lambda k: scores[k])
             selected_model = self.model_registry.resolve_model(best_category)
-            logger.info(f"Selected model '{selected_model}' for category '{best_category}'")
+            log_structured(logger, logging.INFO, "Model selected", 
+                          model=selected_model, 
+                          category=best_category,
+                          prompt_length=len(prompt))
             return selected_model
         
         return self.model_registry.get_default_model()

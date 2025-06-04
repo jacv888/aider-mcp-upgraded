@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import threading
 import psutil
 import time
-import logging
+from app.core.logging import get_logger, log_structured
 from queue import Queue, Full, Empty
 
 # Load environment variables from multiple locations using ModelRegistry
@@ -26,8 +26,7 @@ from app.cost.cost_manager import cost_manager, estimate_cost, check_budget, rec
 FALL_BACK_MODEL = "gpt-4.1-mini"
 
 # Configure logging for resilience features
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("aider_mcp_resilience")
+logger = get_logger("aider_mcp_resilience", "operational")
 
 # Resilience configuration from environment variables with sensible defaults
 MAX_TASK_QUEUE_SIZE = int(os.getenv("MAX_TASK_QUEUE_SIZE", "10"))
@@ -322,8 +321,12 @@ def code_with_ai(
                 estimated_input = cost_estimate.input_tokens if 'cost_estimate' in locals() else 1000
                 estimated_output = max(500, len(str(result)) // 4)  # Rough estimate from result length
                 
+                # Generate descriptive task name from prompt
+                from app.cost.cost_manager import generate_task_name
+                task_name = generate_task_name(prompt)
+                
                 # Record the cost
-                cost_result = record_cost(task_id, estimated_input, estimated_output, model, duration)
+                cost_result = record_cost(task_id, estimated_input, estimated_output, model, duration, task_name)
                 
                 # Add cost info to result if it's JSON
                 try:

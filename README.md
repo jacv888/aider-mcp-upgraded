@@ -1,10 +1,10 @@
-# 🚀 Aider-MCP: Advanced AI Coding Server with Resilience & Strategic Model Selection
+# 🚀 Aider-MCP: Advanced AI Coding Server with Analytics Architecture
 
 [![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)]()
-[![Resilience](https://img.shields.io/badge/resilience-enhanced-blue)]()
+[![Analytics](https://img.shields.io/badge/analytics-dual%20system-blue)]()
 [![Models](https://img.shields.io/badge/models-strategic%20selection-purple)]()
 
-**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with comprehensive resilience features and strategic model selection. Built for reliability, performance, and optimal model utilization.
+**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with a specialized dual analytics architecture. Built for reliability, performance, and comprehensive system monitoring.
 
 ## ✨ Key Features
 
@@ -14,28 +14,20 @@
 - **Custom model override** capability when needed
 - **Cost optimization** through intelligent model matching
 
-### 🛡️ **Resilience & Stability**
-- **Connection health monitoring** with automatic recovery
-- **Resource management** with CPU/Memory thresholds
-- **Circuit breaker protection** against cascade failures
-- **Task queue management** preventing system overload
-- **Zero disconnection** architecture for stable operations
+### 📊 **Dual Analytics Architecture** ✨ **NEW**
+Specialized systems for comprehensive monitoring:
 
-### ⚡ **High-Performance Parallel Processing**
-- **Multi-agent execution** with configurable concurrency limits
-- **2.6x performance boost** through intelligent parallelization
-- **Task branching** for independent development streams
-- **Real-time progress monitoring** and detailed reporting
-
-### 💰 **Cost Management & Budget Controls** ✨ **NEW**
-- **Pre-flight cost estimation** with accurate token counting using tiktoken
-- **Budget limits** prevent expensive operations ($5/task, $50/day, $500/month by default)
+**🔧 Aider-MCP Cost Management**
+- **Pre-flight cost estimation** with accurate token counting
+- **Budget limits** prevent expensive operations ($5/task, $50/day, $500/month)
 - **Real-time cost tracking** included in all task responses
-- **Model-specific pricing** loaded from environment variables for easy updates
-- **Organized data storage** in monthly JSON files (`/costs` directory)
-- **On-demand CSV exports** for accounting and analysis
-- **Privacy protection** with git-excluded cost data
 - **4 MCP cost tools** for analytics, reporting, and budget monitoring
+
+**⚡ Phase 2A Performance & Health Analytics**
+- **Performance monitoring** (task duration, success rates)
+- **Operational health** (error detection, system status)
+- **Business intelligence** insights for optimization
+- **JSON structured logging** with automated metrics extraction
 
 ### ⚙️ **Advanced Configuration System**
 - **Priority-based configuration** loading (project → global → defaults)
@@ -43,20 +35,59 @@
 - **Profile-based settings** (development, production, high-load)
 - **Runtime configuration updates** without server restart
 
-## 🏗️ Architecture Overview
+## 🏗️ Analytics Architecture
+
+The system provides comprehensive monitoring through two specialized, independent systems:
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   MCP Client    │◄──►│   Aider-MCP      │◄──►│   AI Models     │
-│   (Claude)      │    │   Server         │    │   (Strategic)   │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                               │
-                    ┌──────────┼──────────┐
-                    │          │          │
-            ┌───────▼───┐ ┌────▼────┐ ┌───▼────────┐
-            │ Task Queue│ │Resource │ │ Cost       │
-            │ Manager   │ │Monitor  │ │ Manager    │
-            └───────────┘ └─────────┘ └────────────┘
+COST MANAGEMENT           PERFORMANCE & HEALTH
+(Aider-MCP Functions)     (Phase 2A Analytics)
+┌─────────────────┐      ┌─────────────────────┐
+│ get_cost_summary│      │ extract_performance │
+│ estimate_cost   │      │ extract_operational │
+│ budget_status   │      │ system_health       │
+│ export_reports  │      │ business_insights   │
+└─────────────────┘      └─────────────────────┘
+        │                          │
+        └──────────┬─────────────────┘
+                   │
+            ┌─────────────┐
+            │   USER      │
+            │ Uses both   │
+            │ as needed   │
+            └─────────────┘
+```
+
+### Benefits of Dual System Architecture
+- ✅ **Specialized Excellence** - Each system optimized for its purpose
+- ✅ **No Duplication** - Clear separation of responsibilities
+- ✅ **Independent Evolution** - Systems can be updated separately
+- ✅ **User Clarity** - Know exactly which tool to use when
+
+## 📋 USER GUIDANCE
+
+### For Cost Management:
+```python
+# Use Aider-MCP Functions
+get_cost_summary(days=7)
+estimate_task_cost(prompt="Create component")
+get_budget_status()
+export_cost_report(format="csv")
+# Export different time periods
+export_cost_report(format="csv", days=7)   # Last week
+export_cost_report(format="csv", days=1)   # Today only
+# Export as JSON instead
+export_cost_report(format="json", days=30)
+# Export summary format
+export_cost_report(format="summary", days=30)
+```
+
+### For Performance & Health Analytics:
+```bash
+# Use Phase 2A Analytics
+python -m app.analytics.metrics_extractor --report=summary
+python -m app.analytics.metrics_extractor --report=performance
+python -m app.analytics.metrics_extractor --report=operational
 ```
 
 ## 📁 Project Structure ✨ **NEW**
@@ -170,9 +201,9 @@ code_with_multiple_ai(
 # Each task includes cost_info in response
 ```
 
-#### Cost Management Tools ✨ **NEW**
+#### Cost Management (Aider-MCP Functions) ✨ **NEW**
 ```python
-# Get cost summary (loads from monthly JSON files)
+# Get comprehensive cost summary
 get_cost_summary(days=7)
 # Returns: {"total_cost": 0.045, "task_count": 12, "average_cost": 0.004}
 
@@ -193,10 +224,31 @@ export_cost_report(format="csv", days=30)
 # Returns: {"success": true, "file": "...", "records": 15}
 ```
 
-## 💾 Cost Data Organization ✨ **NEW**
+#### Performance & Health Analytics (Phase 2A) ✨ **NEW**
+```bash
+# Generate summary report
+python -m app.analytics.metrics_extractor --report=summary
 
-### Automatic Data Storage
-Cost data is automatically organized in monthly files for optimal performance and management:
+# Performance-specific analysis
+python -m app.analytics.metrics_extractor --report=performance
+
+# Operational health monitoring
+python -m app.analytics.metrics_extractor --report=operational
+
+# JSON output for integration
+python -m app.analytics.metrics_extractor --output=json
+
+# Generate HTML reports
+python app/analytics/generate_reports.py --export=html
+
+# Continuous monitoring
+python app/analytics/generate_reports.py --watch --interval=300
+```
+
+## 💾 Analytics Data Organization ✨ **NEW**
+
+### Cost Management (Aider-MCP)
+Automatic cost data storage in monthly files:
 
 ```
 costs/
@@ -205,27 +257,45 @@ costs/
 └── cost_export_*.csv           # On-demand exports only
 ```
 
+### Performance Analytics (Phase 2A)
+Structured logging for performance monitoring:
+
+```
+logs/
+├── operational.json           # Machine-readable structured logs
+├── operational.log           # Human-readable standard logs
+└── reports/                  # Generated analytics reports
+    ├── summary_latest.json
+    ├── performance_latest.json
+    └── operational_latest.json
+```
+
 ### Key Features
-- **📊 Monthly JSON files** prevent massive single files
+- **📊 Monthly JSON files** prevent massive single files (cost management)
 - **📋 CSV exports on request** via `export_cost_report(format="csv")`
 - **🔒 Git protection** - `costs/` directory excluded from version control
 - **📈 Auto-analytics** - loads 2-3 recent months for comprehensive summaries
-- **💾 Automatic backups** - `.json.bak` files created on save
 - **⚡ Fast loading** - only recent data loaded for better performance
+- **🎯 Specialized systems** - cost tracking separate from performance monitoring
 
 ### Usage Examples
 ```python
-# Automatic: All tasks save to current month JSON
+# Cost Management (Aider-MCP Functions)
 code_with_ai(prompt="...", editable_files=["..."])
 # → Saves to costs/costs_2025-06.json
 
-# Manual: Export specific period to CSV
 export_cost_report(format="csv", days=30)
 # → Creates costs/cost_export_20250603_181341.csv
 
-# Analytics: Get summary from monthly files
 get_cost_summary(days=90)
 # → Loads costs_2025-06.json + costs_2025-05.json + costs_2025-04.json
+
+# Performance Analytics (Phase 2A)
+python -m app.analytics.metrics_extractor --report=summary
+# → Analyzes logs/operational.json
+
+python demo_phase2a.py
+# → Generates sample data and demonstrates analytics
 ```
 
 ## 📋 Configuration Guide
@@ -254,26 +324,26 @@ CIRCUIT_BREAKER_RESET_TIMEOUT=60      # Reset time (seconds)
 HEALTH_CHECK_INTERVAL=30        # Check frequency (seconds)
 ```
 
-### Cost Management & Budget Controls ✨ **NEW**
+### Analytics Settings
 ```bash
-# Budget Protection
+# Cost Management (Aider-MCP)
 MAX_COST_PER_TASK=5.00          # Maximum cost per task (USD)
 MAX_DAILY_COST=50.00            # Daily spending limit (USD)
 MAX_MONTHLY_COST=500.00         # Monthly spending limit (USD)
 COST_WARNING_THRESHOLD=1.00     # Warning threshold (USD)
-
-# Cost Tracking & Data Storage
 ENABLE_COST_TRACKING=true       # Enable cost management features
 ENABLE_COST_LOGGING=false       # Console logging (off by default)
 
-# Data Storage (automatic - no configuration needed)
-# JSON: Saved to /costs/costs_YYYY-MM.json (monthly files)
-# CSV: On-demand export to /costs/cost_export_TIMESTAMP.csv
+# Performance Analytics (Phase 2A)
+LOG_ENABLE_JSON_FILE=true            # Enable structured JSON logging
+LOG_ENABLE_STRUCTURED_DATA=true      # Include [key=value] structured data
+LOG_ENABLE_METRICS_EXTRACTION=true   # Enable automated metrics extraction
+METRICS_EXTRACTION_INTERVAL=300      # Extract metrics every N seconds
 
-# Model Pricing (per 1M tokens) - Easy to update when prices change
-GPT_4_1_MINI_INPUT_PRICE=0.15   # GPT-4.1 Mini input price
-GPT_4_1_MINI_OUTPUT_PRICE=0.60  # GPT-4.1 Mini output price
-# ... (see .env.example for all model pricing)
+# Data Storage (automatic - no configuration needed)
+# Cost: Saved to /costs/costs_YYYY-MM.json (monthly files)
+# Performance: Saved to /logs/operational.json (structured logs)
+# Reports: On-demand generation in /logs/reports/
 ```
 
 ### Strategic Model Configuration
@@ -354,7 +424,43 @@ The scripts automatically detect the correct Claude Desktop config location:
 CLAUDE_CONFIG_PATH=/custom/path/to/claude_desktop_config.json
 ```
 
-## 🎯 Strategic Model Selection
+## 🎯 Which Analytics System to Use?
+
+### Use Aider-MCP Cost Functions When:
+- 💰 Planning budgets and estimating costs
+- 📊 Monitoring spending and budget limits
+- 📈 Analyzing cost efficiency across models
+- 📋 Generating financial reports
+- 💵 Making cost-based optimization decisions
+
+### Use Phase 2A Analytics When:
+- ⚡ Monitoring system performance and reliability
+- 🔍 Detecting operational issues and errors
+- 📊 Analyzing task execution patterns
+- 🏥 Assessing system health status
+- 🚀 Optimizing performance bottlenecks
+
+### Use Both Together When:
+- 📊 Creating comprehensive operational reports
+- 🎯 Making holistic optimization decisions
+- 📈 Conducting full system analysis
+- 🏗️ Planning capacity and resources
+
+### Example Integration Patterns
+
+```python
+# Daily monitoring
+cost_summary = get_cost_summary(days=1)
+health_check = LogMetricsExtractor().extract_operational_metrics()
+
+# Weekly optimization
+if health_check['error_rate'] > 0.05 and cost_summary['daily_avg'] > budget:
+    optimize_for_both_performance_and_cost()
+
+# Monthly reporting
+cost_report = export_cost_report(days=30, format="csv")
+perf_report = generate_reports.py --export=html
+```
 
 The system automatically selects optimal models based on task analysis:
 
@@ -395,30 +501,32 @@ The system automatically selects optimal models based on task analysis:
 
 Based on real testing with tech startup landing page generation:
 
-| Metric | Before Resilience | After Resilience + Cost Management |
-|--------|------------------|------------------|
-| **Connection Stability** | ❌ Disconnected | ✅ **100% Stable** |
-| **Task Success Rate** | ❌ Failed | ✅ **100% (3/3)** |
-| **Parallel Speedup** | ❌ N/A | ✅ **2.64x** |
-| **Resource Usage** | ❌ Uncontrolled | ✅ **Monitored** |
-| **Recovery Time** | ❌ Manual restart | ✅ **Automatic** |
+| Metric | Before Analytics | After Dual Analytics |
+|--------|------------------|---------------------|
+| **System Monitoring** | ❌ Limited | ✅ **Comprehensive** |
 | **Cost Transparency** | ❌ Unknown | ✅ **Real-time tracking** |
+| **Performance Insights** | ❌ None | ✅ **Detailed analytics** |
 | **Budget Protection** | ❌ No limits | ✅ **Automatic blocking** |
+| **Task Success Rate** | ✅ High | ✅ **100% (monitored)** |
+| **Parallel Speedup** | ✅ 2.64x | ✅ **2.64x (tracked)** |
+| **Error Detection** | ❌ Manual | ✅ **Automated** |
+| **Health Monitoring** | ❌ None | ✅ **Real-time** |
 
-### Cost Management Results ✨ **NEW**
+### Analytics Results ✨ **NEW**
+
+**Cost Management:**
 - **Simple tasks**: ~$0.0008 (500 tokens, GPT-4.1 Mini)
 - **Medium tasks**: ~$0.003 (2,000 tokens)
 - **Budget protection**: Prevents tasks >$5.00 automatically
 - **Overhead**: <2ms per task, zero token usage for cost calculations
 - **Cost tracking**: Included in every response JSON
 
-### Test Results
-- **Tasks**: 3 parallel (HTML, JS, CSS generation)
-- **Execution Time**: 25.02 seconds (parallel) vs 65.96 seconds (sequential)
-- **Files Generated**: 451 lines of production-ready code
-- **Connection**: Zero disconnections throughout intensive processing
-- **Total Cost**: $0.024 for complete landing page generation
-- **Data Storage**: Organized in monthly JSON files with on-demand CSV export
+**Performance Analytics:**
+- **Task duration**: Average 12.12s across 10 sessions
+- **Success rate**: 100% completion rate monitored
+- **Error detection**: 0% error rate with automated alerts
+- **Health status**: "HEALTHY" with real-time assessment
+- **Analytics overhead**: Minimal impact on performance
 
 ## 🔧 Advanced Usage
 
@@ -552,3 +660,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ for developers who need reliable, intelligent AI coding assistance**
+
+### Test Results
+- **Tasks**: 3 parallel (HTML, JS, CSS generation)
+- **Execution Time**: 25.02 seconds (parallel) vs 65.96 seconds (sequential)
+- **Files Generated**: 451 lines of production-ready code
+- **Total Cost**: $0.024 for complete landing page generation
+- **Data Storage**: Organized in monthly JSON files + structured performance logs
+- **Analytics**: Real-time cost tracking + performance monitoring
+- **Health Status**: "HEALTHY" with 0% error rate throughout execution

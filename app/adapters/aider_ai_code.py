@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import List, Optional, Dict, Any, Union
 import os
 import os.path
@@ -6,7 +7,7 @@ import subprocess
 from dotenv import load_dotenv
 # Import our custom implementation instead of the actual aider package
 from app.adapters.aider_adapter import Model, Coder, InputOutput
-from app.core.logging import get_logger
+from app.core.logging import get_logger, log_structured
 
 # Load environment variables with MCP aider-mcp as primary source
 load_dotenv()  # Load from current directory (lowest priority)
@@ -34,15 +35,13 @@ def _get_changes_diff_or_content(
         working_dir: The working directory where the git repo is located
     """
     diff = ""
-    # Log current directory for debugging
+    # Log git diff processing (consolidated)
     current_dir = os.getcwd()
-    logger.info(f"Current directory during diff: {current_dir}")
-    if working_dir:
-        logger.info(f"Using working directory: {working_dir}")
-
-    # Always attempt to use git
     files_arg = " ".join(relative_editable_files)
-    logger.info(f"Attempting to get git diff for: {' '.join(relative_editable_files)}")
+    log_structured(logger, logging.INFO, "Processing git diff", 
+                  working_dir=working_dir or current_dir, 
+                  files=len(relative_editable_files),
+                  current_dir=current_dir)
 
     try:
         # Use git -C to specify the repository directory
@@ -71,7 +70,7 @@ def _get_changes_diff_or_content(
                     with open(full_path, "r") as f:
                         content = f.read()
                         diff += f"--- {file_path} ---\n{content}\n\n"
-                        logger.info(f"Read content for {file_path}")
+                        logger.debug(f"Read content for {file_path}")  # Moved to DEBUG level
                 except Exception as read_e:
                     logger.error(
                         f"Failed reading file {full_path} for content fallback: {read_e}"
@@ -231,19 +230,19 @@ def code_with_aider(
     Returns:
         Dict[str, Any]: {'success': True/False, 'diff': str with git diff output}
     """
-    logger.info("Starting code_with_aider process.")
-    logger.info(f"Prompt: '{ai_coding_prompt}'")
-
     # Working directory must be provided
     if not working_dir:
         error_msg = "Error: working_dir is required for code_with_aider"
         logger.error(error_msg)
         return json.dumps({"success": False, "diff": error_msg})
-
-    logger.info(f"Working directory: {working_dir}")
-    logger.info(f"Editable files: {relative_editable_files}")
-    logger.info(f"Readonly files: {relative_readonly_files}")
-    logger.info(f"Model: {model}")
+    
+    # Consolidated session start logging
+    log_structured(logger, logging.INFO, "Starting Aider coding session",
+                  prompt_length=len(ai_coding_prompt),
+                  working_dir=working_dir,
+                  editable_files=len(relative_editable_files) if relative_editable_files else 0,
+                  readonly_files=len(relative_readonly_files) if relative_readonly_files else 0,
+                  model=model)
 
     # Store the current directory
     original_dir = os.getcwd()
@@ -289,13 +288,15 @@ def code_with_aider(
             detect_urls=False,
             use_git=True,  # Always use git
         )
-        logger.info("Aider coder instance created successfully.")
+        logger.debug("Aider coder instance created successfully.")
 
         # Run the coding session using the CLI
-        logger.info("Starting Aider coding session...")
         aider_result = coder.run(ai_coding_prompt)
-        logger.info(f"Aider coding session result: {aider_result if len(aider_result) < 100 else aider_result[:100] + '...'}")
-        logger.info("Aider coding session finished.")
+        
+        # Consolidated session completion logging
+        log_structured(logger, logging.INFO, "Aider coding session completed",
+                      result_length=len(aider_result),
+                      success=True)
 
         # Process the results after the coder has run
         logger.info("Processing coder results...")

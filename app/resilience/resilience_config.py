@@ -1,15 +1,13 @@
 import os
 import json
-import logging
 from typing import Dict, Any, Optional, Union
+from app.core.logging import get_logger, log_structured
 
-# Configure a logger for this module
-logger = logging.getLogger(__name__)
-logger.setLevel(os.getenv("AIDER_MCP_RESILIENCE_LOG_LEVEL", "INFO").upper())
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+# Configure a logger for this module  
+logger = get_logger(__name__, "operational")
+# Respect environment variable for log level if specified
+if "AIDER_MCP_RESILIENCE_LOG_LEVEL" in os.environ:
+    logger.setLevel(os.getenv("AIDER_MCP_RESILIENCE_LOG_LEVEL", "INFO").upper())
 
 
 class ResilienceConfig:

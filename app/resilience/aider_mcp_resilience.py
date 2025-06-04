@@ -28,6 +28,7 @@ import queue
 import psutil
 from collections import deque
 from typing import Callable, Optional, Any, Dict
+from app.core.logging import get_logger, log_structured
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -264,8 +265,7 @@ class PerformanceMetrics(threading.Thread):
 class AiderMCPResilience:
     def __init__(self, config: Optional[Dict] = None, logger: Optional[logging.Logger] = None):
         self.config = {**DEFAULT_CONFIG, **(config or {})}
-        self.logger = logger or logging.getLogger("AiderMCPResilience")
-        self.logger.setLevel(logging.INFO)
+        self.logger = logger or get_logger("AiderMCPResilience", "operational")
         self.heartbeat_monitor = None
         self.resource_manager = None
         self.task_queue_manager = None
@@ -358,14 +358,3 @@ class AiderMCPResilience:
 
     def get_connection_pool_size(self):
         return self.connection_pool.size()
-
-# Example logger setup (can be replaced by MCP's logger)
-def get_logger(name="AiderMCPResilience"):
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(name)s: %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-    return logger

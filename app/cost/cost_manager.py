@@ -12,9 +12,10 @@ from typing import Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from app.core.logging import get_logger, log_structured
 
 # Get logger
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__, "operational")
 
 @dataclass
 class CostEstimate:
@@ -41,6 +42,7 @@ class TaskCostResult:
     duration_seconds: float
     timestamp: datetime
     task_id: str
+    task_name: str = "Unnamed Task"
     currency: str = "USD"
 
 class CostManager:
@@ -216,7 +218,7 @@ class CostManager:
         return True, ""
     
     def record_task_cost(self, task_id: str, input_tokens: int, output_tokens: int,
-                        model: str, duration_seconds: float) -> TaskCostResult:
+                        model: str, duration_seconds: float, task_name: str = "Unnamed Task") -> TaskCostResult:
         """Record actual cost after task execution."""
         input_cost, output_cost, total_cost = self.calculate_cost(
             input_tokens, output_tokens, model
@@ -232,7 +234,8 @@ class CostManager:
             model=model,
             duration_seconds=duration_seconds,
             timestamp=datetime.now(),
-            task_id=task_id
+            task_id=task_id,
+            task_name=task_name
         )
         
         # Store in history
@@ -248,8 +251,12 @@ class CostManager:
         
         # Log the cost only if logging is enabled
         if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
-            logger.info(f"Task {task_id} cost: ${total_cost:.4f} "
-                       f"({input_tokens}+{output_tokens} tokens, {model})")
+            log_structured(logger, logging.INFO, "Task cost calculated",
+                          task_id=task_id,
+                          total_cost=f"${total_cost:.4f}",
+                          input_tokens=input_tokens,
+                          output_tokens=output_tokens,
+                          model=model)
         
         return result
     
@@ -323,11 +330,33 @@ def check_budget(estimated_cost: float) -> Tuple[bool, str]:
     return cost_manager.check_budget_limits(estimated_cost)
 
 
+def generate_task_name(prompt: str) -> str:
+    """Generate a descriptive task name from the prompt."""
+    import re
+    
+    # Clean and truncate the prompt
+    clean_prompt = re.sub(r'[^\w\s]', '', prompt.lower())
+    words = clean_prompt.split()
+    
+    # Extract key words (skip common words)
+    skip_words = {'create', 'make', 'build', 'write', 'generate', 'add', 'implement', 'a', 'an', 'the', 'for', 'with', 'that', 'simple', 'basic'}
+    key_words = [word for word in words[:10] if word not in skip_words and len(word) > 2]
+    
+    # Generate name
+    if key_words:
+        task_name = ' '.join(key_words[:4])  # Take first 4 meaningful words
+        # Capitalize first letter of each word
+        task_name = ' '.join(word.capitalize() for word in task_name.split())
+        return task_name[:50]  # Limit to 50 characters
+    else:
+        return "Coding Task"
+
+
 def record_cost(task_id: str, input_tokens: int, output_tokens: int,
-               model: str, duration_seconds: float) -> TaskCostResult:
+               model: str, duration_seconds: float, task_name: str = "Unnamed Task") -> TaskCostResult:
     """Record actual task cost."""
     return cost_manager.record_task_cost(task_id, input_tokens, output_tokens, 
-                                        model, duration_seconds)
+                                        model, duration_seconds, task_name)
 
 
 def get_cost_summary(days: int = 7) -> Dict:
