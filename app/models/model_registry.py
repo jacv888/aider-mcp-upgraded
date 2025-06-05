@@ -7,7 +7,10 @@ import os
 import json
 import threading
 from typing import Dict, Optional, Set
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 from pathlib import Path
 
 
@@ -52,15 +55,16 @@ class ModelRegistry:
         """Load model configuration from environment files in priority order."""
         self._config_file_paths = self._get_config_paths()
         
-        # Load in reverse priority order (lowest to highest)
-        for config_path in reversed(self._config_file_paths):
-            if os.path.exists(config_path):
-                load_dotenv(config_path, override=False)
-        
-        # Final load with override to ensure highest priority takes precedence
-        primary_config = self._config_file_paths[0]
-        if os.path.exists(primary_config):
-            load_dotenv(primary_config, override=True)
+        if load_dotenv is not None:
+            # Load in reverse priority order (lowest to highest)
+            for config_path in reversed(self._config_file_paths):
+                if os.path.exists(config_path):
+                    load_dotenv(config_path, override=False)
+            
+            # Final load with override to ensure highest priority takes precedence
+            primary_config = self._config_file_paths[0]
+            if os.path.exists(primary_config):
+                load_dotenv(primary_config, override=True)
         
         self._load_model_mappings()
     

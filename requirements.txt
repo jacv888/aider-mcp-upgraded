@@ -21,3 +21,8 @@ pytest>=7.0.0
 
 # For environment variable management (already listed above)
 # python-dotenv>=1.0.0  # Duplicate removed
+
+# Development dependencies (optional)
+black>=22.0.0
+isort>=5.10.0
+flake8>=4.0.0
