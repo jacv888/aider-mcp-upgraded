@@ -82,11 +82,25 @@ def backup_original():
         # In CI, do not exit, just warn
 
 def install_dependencies():
-    print("Installing required dependencies...")
+    print("Checking required dependencies...")
     for package in REQUIRED_PACKAGES:
-        print(f"Installing {package}...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-    print("All dependencies installed.")
+        try:
+            __import__(package)
+            print(f"Dependency '{package}' is already installed. Skipping installation.")
+        except ImportError:
+            print(f"Dependency '{package}' not found. Attempting to install...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+                print(f"Successfully installed '{package}'.")
+            except subprocess.CalledProcessError:
+                print(f"System-wide install failed for '{package}'. Trying user install...")
+                try:
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", package])
+                    print(f"Successfully installed '{package}' with --user flag.")
+                except subprocess.CalledProcessError:
+                    print(f"Failed to install '{package}'. Please install it manually.")
+                    # Do not raise error, continue to allow script to run in CI or restricted envs
+    print("Dependency check/installation complete.")
 
 def add_resilience_features():
     if not os.path.exists(TARGET_FILE):

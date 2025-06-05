@@ -27,6 +27,39 @@ from app.cost.cost_manager import cost_manager, estimate_cost, check_budget, rec
 from app.context import extract_context
 from app.context.auto_detection import get_auto_detected_targets
 
+# --- Resilience features added by install_resilience.py ---
+import psutil
+import threading
+import time
+import sys
+
+def monitor_memory(threshold_mb=500):
+    def monitor():
+        process = psutil.Process()
+        while True:
+            mem = process.memory_info().rss / (1024 * 1024)  # MB
+            if mem > threshold_mb:
+                print(f"[Resilience] Memory usage exceeded {threshold_mb} MB: {mem:.2f} MB. Restarting server.")
+                # Restart logic: exit process to let external supervisor restart it
+                sys.exit(1)
+            time.sleep(5)
+    t = threading.Thread(target=monitor, daemon=True)
+    t.start()
+
+# Start monitoring with threshold from config or default
+import configparser
+config = configparser.ConfigParser()
+config.read("resilience_config.ini")
+threshold = 500
+try:
+    threshold = int(config.get("Resilience", "memory_threshold_mb"))
+except Exception:
+    pass
+
+monitor_memory(threshold)
+# --- End resilience features ---
+
+
 FALL_BACK_MODEL = "gpt-4.1-mini"
 
 # Configure logging for resilience features
