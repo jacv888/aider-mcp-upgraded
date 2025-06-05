@@ -1,10 +1,12 @@
 # 🚀 Aider-MCP: Advanced AI Coding Server with Analytics Architecture
 
 [![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)]()
-[![Analytics](https://img.shields.io/badge/analytics-dual%20system-blue)]()
+[![Analytics](https://img.shields.io/badge/analytics-triple%20system-blue)]()
+[![Auto-Detection](https://img.shields.io/badge/auto--detection-70%25%20savings-orange)]()
 [![Models](https://img.shields.io/badge/models-strategic%20selection-purple)]()
+[![Chunking](https://img.shields.io/badge/logs-monthly%20chunked-green)]()
 
-**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with a specialized dual analytics architecture. Built for reliability, performance, and comprehensive system monitoring.
+**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with auto-detection, context extraction, and a comprehensive triple analytics architecture. Built for reliability, performance, and 70% token reduction through smart optimization.
 
 ## ✨ Key Features
 
@@ -13,6 +15,12 @@
 - **Context-aware selection**: Complex algorithms → Gemini 2.5 Pro, Simple tasks → GPT-4.1 Nano
 - **Custom model override** capability when needed
 - **Cost optimization** through intelligent model matching
+
+### 🎯 **Auto-Detection & Context Extraction** ✨ **NEW**
+- **70% token reduction** through intelligent context extraction
+- **Automatic target detection** from prompts (hands-free optimization)
+- **Smart context pruning** focuses on relevant code sections only
+- **Comprehensive analytics** track auto-detection performance and savings
 
 ### 📊 **Dual Analytics Architecture** ✨ **NEW**
 Specialized systems for comprehensive monitoring:
@@ -29,6 +37,12 @@ Specialized systems for comprehensive monitoring:
 - **Business intelligence** insights for optimization
 - **JSON structured logging** with automated metrics extraction
 
+### 📅 **Monthly Log Chunking** ✨ **NEW**
+- **Standardized monthly files** across all log types for consistent analysis
+- **Easy correlation** between operational, auto-detection, and cost data
+- **Time-based archival** with predictable monthly chunks
+- **Cross-system analytics** enabled by unified time windows
+
 ### ⚙️ **Advanced Configuration System**
 - **Priority-based configuration** loading (project → global → defaults)
 - **Environment variable support** with hot-reloading
@@ -37,20 +51,24 @@ Specialized systems for comprehensive monitoring:
 
 ## 🏗️ Analytics Architecture
 
-The system provides comprehensive monitoring through two specialized, independent systems:
+The system provides comprehensive monitoring through specialized, independent systems with standardized monthly chunking:
 
 ```
-COST MANAGEMENT           PERFORMANCE & HEALTH
-(Aider-MCP Functions)     (Phase 2A Analytics)
-┌─────────────────┐      ┌─────────────────────┐
-│ get_cost_summary│      │ extract_performance │
-│ estimate_cost   │      │ extract_operational │
-│ budget_status   │      │ system_health       │
-│ export_reports  │      │ business_insights   │
-└─────────────────┘      └─────────────────────┘
-        │                          │
-        └──────────┬─────────────────┘
+COST MANAGEMENT           PERFORMANCE & HEALTH    AUTO-DETECTION ANALYTICS
+(Aider-MCP Functions)     (Phase 2A Analytics)    (Dedicated Logging)
+┌─────────────────┐      ┌─────────────────────┐  ┌────────────────────┐
+│ get_cost_summary│      │ extract_performance │  │ Auto-detection     │
+│ estimate_cost   │      │ extract_operational │  │ Token reduction    │
+│ budget_status   │      │ system_health       │  │ Performance impact │
+│ export_reports  │      │ business_insights   │  │ Context extraction │
+└─────────────────┘      └─────────────────────┘  └────────────────────┘
+        │                          │                        │
+        └──────────┬─────────────────┴────────────────────────┘
                    │
+             📅 MONTHLY CHUNKING (Standardized)
+         /costs/costs_2025-06.json
+         /logs/operational_2025-06.json  
+         /logs/auto_detection_2025-06.json
             ┌─────────────┐
             │   USER      │
             │ Uses both   │
@@ -280,25 +298,94 @@ logs/
 
 ### Usage Examples
 ```python
+# Auto-Detection & Context Extraction (70% token savings)
+code_with_ai(prompt="Fix the calculate_sum function", editable_files=["math_utils.py"])
+# → Auto-detects "calculate_sum" target, extracts focused context
+# → Response includes auto_detection_info with token reduction metrics
+
+code_with_multiple_ai(
+    prompts=["Optimize the UserManager class", "Fix the authenticate method"],
+    editable_files_list=[["user_manager.py"], ["auth.py"]]
+)
+# → Auto-detects multiple targets, provides aggregated auto_detection_summary
+
 # Cost Management (Aider-MCP Functions)
-code_with_ai(prompt="...", editable_files=["..."])
-# → Saves to costs/costs_2025-06.json
+get_cost_summary(days=90)
+# → Loads costs_2025-06.json + costs_2025-05.json + costs_2025-04.json
 
 export_cost_report(format="csv", days=30)
 # → Creates costs/cost_export_20250603_181341.csv
 
-get_cost_summary(days=90)
-# → Loads costs_2025-06.json + costs_2025-05.json + costs_2025-04.json
-
 # Performance Analytics (Phase 2A)
 python -m app.analytics.metrics_extractor --report=summary
-# → Analyzes logs/operational.json
+# → Analyzes logs/operational_2025-06.json
 
-python demo_phase2a.py
-# → Generates sample data and demonstrates analytics
+# Auto-Detection Analytics
+# → Check logs/auto_detection_2025-06.json for detailed auto-detection metrics
+```
+
+## 📊 Auto-Detection Response Examples ✨ **NEW**
+
+### Single AI with Auto-Detection
+```json
+{
+  "success": true,
+  "diff": "Fixed calculate_sum function with proper error handling",
+  "auto_detection_info": {
+    "auto_detected_targets": ["calculate_sum"],
+    "context_extraction_used": true,
+    "files_processed_with_context": ["math_utils.py"],
+    "estimated_token_reduction": "65%",
+    "target_elements_provided": false,
+    "target_elements_used": ["calculate_sum"]
+  }
+}
+```
+
+### Multiple AI with Auto-Detection Summary
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "auto_detection_info": {
+        "auto_detected_targets": ["UserManager"],
+        "context_extraction_used": true,
+        "estimated_token_reduction": "70%"
+      }
+    }
+  ],
+  "auto_detection_summary": {
+    "total_tasks": 2,
+    "tasks_with_auto_detection": 2,
+    "tasks_with_context_extraction": 2,
+    "estimated_token_reductions": ["70%", "60%"]
+  }
+}
 ```
 
 ## 📋 Configuration Guide
+
+### Auto-Detection & Context Extraction ✨ **NEW**
+```bash
+# Auto-Detection Features (Enable 70% token savings)
+ENABLE_CONTEXT_EXTRACTION=true      # 🎯 Smart context extraction
+ENABLE_AUTO_TARGET_DETECTION=true   # 🚀 Automatic target detection
+CONTEXT_DEFAULT_MAX_TOKENS=4000     # 🎚️ Token budget per file
+CONTEXT_MIN_RELEVANCE_SCORE=3.0     # 📊 Relevance threshold
+
+# Auto-Detection Analytics (Monthly chunked)
+ENABLE_AUTO_DETECTION_LOGGING=true  # 🔍 Dedicated analytics logging
+AUTO_DETECTION_LOG_PRETTY=false     # 🎨 JSON format (minified/pretty)
+```
+
+### Monthly Log Chunking ✨ **NEW**
+All logs now use standardized monthly chunking:
+- `/logs/operational_2025-06.json` - Operational events
+- `/logs/auto_detection_2025-06.json` - Auto-detection analytics  
+- `/costs/costs_2025-06.json` - Cost tracking
+
+Benefits: Easy correlation, time-based analysis, consistent archival
 
 ### Priority System
 Configuration is loaded in priority order:

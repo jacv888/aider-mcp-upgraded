@@ -10,6 +10,7 @@ from .language_parsers import PythonParser, TypeScriptParser, JavaScriptParser
 from .relevance_scorer import RelevanceScorer
 from .context_extractor import ContextExtractor
 from .types import ContextBlock, ExtractionConfig
+from .auto_detection import get_auto_detected_targets, extract_targets_from_prompt
 
 __all__ = [
     'ContextManager',
@@ -20,5 +21,7 @@ __all__ = [
     'RelevanceScorer',
     'ContextExtractor',
     'ContextBlock',
-    'ExtractionConfig'
+    'ExtractionConfig',
+    'get_auto_detected_targets',
+    'extract_targets_from_prompt'
 ]

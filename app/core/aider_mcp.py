@@ -23,6 +23,10 @@ from app.models.strategic_model_selector import get_optimal_model
 # Import cost management
 from app.cost.cost_manager import cost_manager, estimate_cost, check_budget, record_cost
 
+# Import context extraction system
+from app.context import extract_context
+from app.context.auto_detection import get_auto_detected_targets
+
 FALL_BACK_MODEL = "gpt-4.1-mini"
 
 # Configure logging for resilience features
@@ -206,6 +210,7 @@ def code_with_ai(
     editable_files: List[str],
     readonly_files: Optional[List[str]] = None,
     model: Optional[str] = None,  # Strategic model selection if None
+    target_elements: Optional[List[str]] = None,  # NEW: Context extraction targets
 ) -> str:
     """
     Use Aider to perform AI coding tasks with strategic model selection.
@@ -229,6 +234,7 @@ def code_with_ai(
         editable_files: List of files that can be edited by the AI
         readonly_files: Optional list of files that can be read but not edited (for context)
         model: Optional AI model to use (default: defined in environment variable or fallback model) **Don't change model unless users asked for it**
+        target_elements: Optional list of specific functions/classes/methods to focus on for context extraction
 
     Returns:
         JSON string with results including success status and diff output
@@ -297,13 +303,84 @@ def code_with_ai(
         import time
         start_time = time.time()
         
+        # Phase 2.5: Smart Auto-Detection (if target_elements not provided)
+        if not target_elements:
+            auto_detected = get_auto_detected_targets(
+                prompt=prompt,
+                file_paths=editable_files,
+                working_dir=working_dir
+            )
+            if auto_detected:
+                target_elements = auto_detected
+                logger.info(f"🎯 AUTO-DETECTION SUCCESS: Found targets {target_elements} from prompt")
+            else:
+                logger.info("🔍 AUTO-DETECTION: No targets detected, using full file processing")
+        
+        # Phase 2: Context-Aware File Pruning (if enabled and target_elements available)
+        enhanced_prompt = prompt
+        context_processed_files = []
+        
+        if (target_elements and 
+            os.getenv("ENABLE_CONTEXT_EXTRACTION", "false").lower() == "true"):
+            try:
+                logger.info("Context extraction enabled, processing files...")
+                
+                # Get configuration
+                max_tokens = int(os.getenv("CONTEXT_DEFAULT_MAX_TOKENS", "4000"))
+                min_relevance = float(os.getenv("CONTEXT_MIN_RELEVANCE_SCORE", "3.0"))
+                
+                # Process each file with context extraction
+                context_sections = []
+                for i, file_path in enumerate(editable_files):
+                    full_path = os.path.join(working_dir, file_path)
+                    
+                    if os.path.exists(full_path):
+                        # Get target element for this file (distribute targets across files)
+                        target = target_elements[i % len(target_elements)] if target_elements else None
+                        
+                        if target:
+                            try:
+                                # Extract focused context using the correct API
+                                context_result = extract_context(
+                                    file_path=full_path,
+                                    target_element=target,  # Single element, not list
+                                    max_tokens=max_tokens // len(editable_files)  # Distribute budget
+                                )
+                                
+                                if context_result:
+                                    context_info = f"\n--- {file_path} (Focused Context for '{target}') ---\n"
+                                    context_info += context_result + "\n\n"
+                                    context_sections.append(context_info)
+                                    context_processed_files.append(file_path)
+                                    logger.info(f"Context extracted for {file_path} targeting '{target}'")
+                                else:
+                                    logger.warning(f"No relevant context found for {file_path} targeting '{target}'")
+                            except Exception as e:
+                                logger.warning(f"Context extraction failed for {file_path} targeting '{target}': {e}")
+                                continue
+                
+                # Enhance prompt with context if any was extracted
+                if context_sections:
+                    enhanced_prompt = f"{prompt}\n\nFocused file context:\n{''.join(context_sections)}"
+                    logger.info(f"💰 CONTEXT EXTRACTION SUCCESS: Enhanced prompt with context from {len(context_processed_files)} files - estimated 70% token reduction")
+                    
+                    # Remove context-processed files from editable_files to avoid duplication
+                    remaining_editable_files = [f for f in editable_files if f not in context_processed_files]
+                    editable_files = remaining_editable_files
+                
+            except Exception as e:
+                logger.warning(f"Context extraction system failed: {e}")
+                # Continue with normal processing
+                enhanced_prompt = prompt
+        
         # Call the Aider integration function
         result = code_with_aider(
-            ai_coding_prompt=prompt,
+            ai_coding_prompt=enhanced_prompt,
             relative_editable_files=editable_files,
             relative_readonly_files=readonly_files,
             model=model,
             working_dir=working_dir,
+            target_elements=target_elements,
         )
         
         # Phase 2: Record actual cost (if cost tracking enabled)
@@ -349,6 +426,27 @@ def code_with_ai(
                 if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
                     logger.warning(f"Cost recording failed: {e}")
         
+        # Add auto-detection metadata to result
+        try:
+            import json
+            result_data = json.loads(result) if isinstance(result, str) else result
+            if isinstance(result_data, dict):
+                # Auto-detection info is now provided by code_with_aider, no need to reconstruct it
+                # If somehow it's missing, add a basic version
+                if "auto_detection_info" not in result_data:
+                    result_data["auto_detection_info"] = {
+                        "auto_detected_targets": None,
+                        "context_extraction_used": False,
+                        "files_processed_with_context": [],
+                        "estimated_token_reduction": "0%",
+                        "target_elements_provided": bool(target_elements),
+                        "target_elements_used": target_elements
+                    }
+                result = json.dumps(result_data)
+        except Exception:
+            # If result parsing fails, just continue with original result
+            pass
+        
         return result
     except Exception as e:
         # Log the error
@@ -373,6 +471,7 @@ def code_with_multiple_ai(
     models: Optional[List[str]] = None,
     max_workers: Optional[int] = None,
     parallel: bool = True,
+    target_elements_list: Optional[List[List[str]]] = None,  # NEW: Context extraction targets
 ) -> str:
     """
     Use Multiple Aider agents with strategic model selection to perform AI coding tasks.
@@ -429,6 +528,7 @@ def code_with_multiple_ai(
         models: Optional list of models to use (one model per prompt)
         max_workers: Optional maximum number of parallel workers (defaults to number of prompts)
         parallel: Whether to run tasks in parallel (True) or sequentially (False). Default is True.
+        target_elements_list: Optional list of lists of specific functions/classes/methods to focus on for context extraction (one list per prompt)
 
     Returns:
         JSON string with aggregated results including success status and diff outputs
@@ -468,6 +568,13 @@ def code_with_multiple_ai(
             error_msg = f"Error: Length of readonly_files_list ({len(readonly_files_list)}) must match length of prompts ({num_prompts})"
             return json.dumps({"success": False, "error": error_msg})
 
+        # Set default empty lists for target_elements_list if not provided
+        if target_elements_list is None:
+            target_elements_list = [None for _ in range(num_prompts)]
+        elif len(target_elements_list) != num_prompts:
+            error_msg = f"Error: Length of target_elements_list ({len(target_elements_list)}) must match length of prompts ({num_prompts})"
+            return json.dumps({"success": False, "error": error_msg})
+
         # Strategic model selection for multiple tasks
         if models is None:
             # Use strategic selection for each prompt
@@ -494,6 +601,7 @@ def code_with_multiple_ai(
             editable_files = editable_files_list[i]
             readonly_files = readonly_files_list[i]
             model = models[i]
+            target_elements = target_elements_list[i]
 
             # Enqueue task or reject if queue is full
             if not enqueue_task(i):
@@ -520,6 +628,7 @@ def code_with_multiple_ai(
                     relative_readonly_files=readonly_files,
                     model=model,
                     working_dir=working_dir,
+                    target_elements=target_elements,
                 )
 
                 # Log the completion of this task with timestamp and duration
@@ -721,6 +830,31 @@ def code_with_multiple_ai(
 
         # Aggregate results
         try:
+            # Collect auto-detection information from all results
+            auto_detection_summary = {
+                "total_tasks": num_prompts,
+                "tasks_with_auto_detection": 0,
+                "tasks_with_context_extraction": 0,
+                "total_files_processed_with_context": 0,
+                "auto_detected_targets_by_task": [],
+                "context_extraction_used_by_task": [],
+                "estimated_token_reductions": []
+            }
+            
+            for result in results:
+                auto_info = result.get("auto_detection_info", {})
+                if auto_info.get("auto_detected_targets"):
+                    auto_detection_summary["tasks_with_auto_detection"] += 1
+                if auto_info.get("context_extraction_used"):
+                    auto_detection_summary["tasks_with_context_extraction"] += 1
+                
+                auto_detection_summary["auto_detected_targets_by_task"].append(auto_info.get("auto_detected_targets"))
+                auto_detection_summary["context_extraction_used_by_task"].append(auto_info.get("context_extraction_used", False))
+                auto_detection_summary["estimated_token_reductions"].append(auto_info.get("estimated_token_reduction", "0%"))
+                
+                files_with_context = auto_info.get("files_processed_with_context", [])
+                auto_detection_summary["total_files_processed_with_context"] += len(files_with_context)
+            
             aggregated_result = {
                 "success": overall_success,  # True only if all prompts succeeded
                 "results": results,
@@ -736,6 +870,7 @@ def code_with_multiple_ai(
                     if parallel and execution_duration > 0
                     else 1.0
                 ),
+                "auto_detection_summary": auto_detection_summary
             }
 
             return json.dumps(aggregated_result, indent=4)

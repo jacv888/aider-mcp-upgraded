@@ -6,6 +6,60 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+
+class MonthlyRotatingFileHandler(logging.FileHandler):
+    """
+    A custom file handler that automatically rotates log files monthly.
+    Creates files like: base_name_2025-06.json, base_name_2025-07.json, etc.
+    """
+    
+    def __init__(self, base_path, base_name, mode='a', encoding=None, delay=False):
+        """
+        Initialize the monthly rotating file handler.
+        
+        Args:
+            base_path: Directory where log files will be stored
+            base_name: Base name for log files (e.g., 'operational', 'auto_detection')
+            mode: File mode (default 'a' for append)
+            encoding: File encoding
+            delay: Whether to delay file opening
+        """
+        self.base_path = Path(base_path)
+        self.base_name = base_name
+        self.current_month = None
+        
+        # Ensure directory exists
+        self.base_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize with current month file
+        current_file = self._get_current_file_path()
+        super().__init__(current_file, mode, encoding, delay)
+    
+    def _get_current_file_path(self):
+        """Get the file path for the current month."""
+        current_month = datetime.now().strftime("%Y-%m")
+        return self.base_path / f"{self.base_name}_{current_month}.json"
+    
+    def emit(self, record):
+        """Emit a log record, rotating to new file if month changed."""
+        current_month = datetime.now().strftime("%Y-%m")
+        
+        # Check if we need to rotate to a new month
+        if self.current_month != current_month:
+            self.current_month = current_month
+            
+            # Close current file
+            if self.stream:
+                self.stream.close()
+                self.stream = None
+            
+            # Update to new file path
+            new_file_path = self._get_current_file_path()
+            self.baseFilename = str(new_file_path)
+        
+        # Call parent emit method
+        super().emit(record)
+
 class JSONFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging"""
     
@@ -60,7 +114,6 @@ def get_logger(name, log_category="operational"):
     enable_console = os.getenv("LOG_ENABLE_CONSOLE", "true").lower() == "true"
     enable_structured = os.getenv("LOG_ENABLE_STRUCTURED_DATA", "true").lower() == "true"
     log_format_type = os.getenv("LOG_FORMAT", "standard")
-    json_file_name = os.getenv("LOG_JSON_FILE_NAME", "operational.json")
     
     # Set log levels based on category
     if log_category == "operational":
@@ -110,13 +163,12 @@ def get_logger(name, log_category="operational"):
             file_handler.setFormatter(standard_formatter)
             logger.addHandler(file_handler)
     
-    # JSON file handler (if enabled) - Phase 2A addition
+    # JSON file handler (if enabled) - Phase 2A addition with monthly rotation
     if enable_json_file and log_category == "operational":
-        json_log_file = log_path / json_file_name
-        json_handler = RotatingFileHandler(
-            json_log_file,
-            maxBytes=max_file_size_mb * 1024 * 1024,
-            backupCount=backup_count
+        # Use monthly rotating handler for operational logs
+        json_handler = MonthlyRotatingFileHandler(
+            base_path=log_path,
+            base_name="operational"
         )
         json_handler.setFormatter(json_formatter)
         logger.addHandler(json_handler)
@@ -158,4 +210,117 @@ def log_structured(logger, level, message, **structured_data):
     record.args = ()
     
     # Log the record (will be formatted differently by each handler)
+    logger.handle(record)
+
+
+class AutoDetectionJSONFormatter(logging.Formatter):
+    """Custom JSON formatter specifically for auto-detection logs"""
+    
+    def format(self, record):
+        # Use the auto-detection data if available, otherwise create basic structure
+        if hasattr(record, 'auto_detection_data'):
+            log_entry = record.auto_detection_data
+        else:
+            log_entry = {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "task_id": getattr(record, 'task_id', 'unknown'),
+                "task_name": getattr(record, 'task_name', 'unknown'),
+                "operation_type": getattr(record, 'operation_type', 'unknown'),
+                "message": record.getMessage()
+            }
+        
+        # Check if pretty formatting is enabled
+        pretty_format = os.getenv("AUTO_DETECTION_LOG_PRETTY", "false").lower() == "true"
+        
+        if pretty_format:
+            return json.dumps(log_entry, indent=2)
+        else:
+            return json.dumps(log_entry)
+
+
+def get_auto_detection_logger() -> logging.Logger:
+    """
+    Get or create the auto-detection logger for tracking auto-detection events and analytics.
+    
+    Returns:
+        Logger instance configured for auto-detection logging
+    """
+    logger_name = "auto_detection"
+    logger = logging.getLogger(logger_name)
+    
+    # Return existing logger if already configured
+    if logger.handlers:
+        return logger
+    
+    # Load configuration from environment variables
+    enable_auto_detection_logging = os.getenv("ENABLE_AUTO_DETECTION_LOGGING", "true").lower() == "true"
+    
+    if not enable_auto_detection_logging:
+        # Return a no-op logger if auto-detection logging is disabled
+        logger.addHandler(logging.NullHandler())
+        return logger
+    
+    log_directory = os.getenv("LOG_DIRECTORY", "logs")
+    max_file_size_mb = int(os.getenv("LOG_MAX_FILE_SIZE_MB", "10"))
+    backup_count = int(os.getenv("LOG_BACKUP_COUNT", "5"))
+    
+    logger.setLevel(logging.INFO)
+    
+    # Create log directory if it doesn't exist
+    Path(log_directory).mkdir(parents=True, exist_ok=True)
+    
+    # JSON file handler for auto-detection events with monthly rotation
+    json_handler = MonthlyRotatingFileHandler(
+        base_path=log_directory,
+        base_name="auto_detection"
+    )
+    json_handler.setFormatter(AutoDetectionJSONFormatter())
+    logger.addHandler(json_handler)
+    
+    return logger
+
+
+def log_auto_detection_event(
+    task_id: str,
+    task_name: str,
+    operation_type: str,
+    model: str,
+    duration_seconds: float,
+    auto_detection_results: Dict[str, Any],
+    performance_impact: Optional[Dict[str, Any]] = None
+):
+    """
+    Log an auto-detection event with comprehensive analytics data.
+    
+    Args:
+        task_id: Unique task identifier for correlation with cost logs
+        task_name: Human-readable task description
+        operation_type: Type of operation (code_with_ai, code_with_multiple_ai)
+        model: AI model used for the operation
+        duration_seconds: Total operation duration
+        auto_detection_results: Results of auto-detection analysis
+        performance_impact: Optional performance metrics
+    """
+    logger = get_auto_detection_logger()
+    
+    # Construct the complete auto-detection log entry
+    log_entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "task_id": task_id,
+        "task_name": task_name,
+        "operation_type": operation_type,
+        "model": model,
+        "duration_seconds": duration_seconds,
+        "auto_detection_results": auto_detection_results,
+        "performance_impact": performance_impact or {}
+    }
+    
+    # Create a custom log record with the auto-detection data
+    record = logger.makeRecord(
+        logger.name, logging.INFO, "(auto_detection)", 0, 
+        f"Auto-detection event: {task_name}", (), None
+    )
+    record.auto_detection_data = log_entry
+    
+    # Log the record
     logger.handle(record)
