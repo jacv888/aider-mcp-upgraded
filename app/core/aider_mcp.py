@@ -27,6 +27,9 @@ from app.cost.cost_manager import cost_manager, estimate_cost, check_budget, rec
 from app.context import extract_context
 from app.context.auto_detection import get_auto_detected_targets
 
+# Import conflict detection system
+from app.core.conflict_detector import FileConflictDetector
+
 # --- Resilience features added by install_resilience.py ---
 import psutil
 import threading
@@ -505,6 +508,7 @@ def code_with_multiple_ai(
     max_workers: Optional[int] = None,
     parallel: bool = True,
     target_elements_list: Optional[List[List[str]]] = None,  # NEW: Context extraction targets
+    conflict_handling: str = os.getenv("DEFAULT_CONFLICT_HANDLING", "auto"),  # NEW: Conflict detection handling from env
 ) -> str:
     """
     Use Multiple Aider agents with strategic model selection to perform AI coding tasks.
@@ -519,6 +523,14 @@ def code_with_multiple_ai(
     - React/Frontend: GPT-4.1 Mini (best for complex logic)
     - API/Backend: Gemini 2.5 Flash (fast for server code)
     - Debugging: GPT-4.1 Mini (best problem-solving)
+
+    🔒 SMART CONFLICT DETECTION:
+    Automatically detects file conflicts between parallel tasks.
+    The conflict handling behavior can be configured via the environment variable
+    DEFAULT_CONFLICT_HANDLING with possible values:
+    - "auto" (default): Detects conflicts and switches to sequential execution
+    - "warn": Detects conflicts but continues parallel execution with warnings
+    - "ignore": Skips conflict detection entirely
 
     💫 EXAMPLE USAGE WITH STRATEGIC SELECTION:
     code_with_multiple_ai(
@@ -562,6 +574,8 @@ def code_with_multiple_ai(
         max_workers: Optional maximum number of parallel workers (defaults to number of prompts)
         parallel: Whether to run tasks in parallel (True) or sequentially (False). Default is True.
         target_elements_list: Optional list of lists of specific functions/classes/methods to focus on for context extraction (one list per prompt)
+        conflict_handling: How to handle file conflicts - "auto" (default: detect and serialize), "warn" (detect and warn), "ignore" (skip detection).
+            This parameter can be overridden by the environment variable DEFAULT_CONFLICT_HANDLING.
 
     Returns:
         JSON string with aggregated results including success status and diff outputs
@@ -571,6 +585,23 @@ def code_with_multiple_ai(
     import concurrent.futures
     import traceback
     from concurrent.futures import ThreadPoolExecutor
+
+    # Validate and normalize conflict_handling from environment variable or parameter
+    valid_conflict_values = {"auto", "warn", "ignore"}
+    if conflict_handling not in valid_conflict_values:
+        logger.warning(f"Invalid DEFAULT_CONFLICT_HANDLING value '{conflict_handling}' detected. Falling back to 'auto'.")
+        conflict_handling = "auto"
+    else:
+        logger.info(f"Using conflict_handling mode: '{conflict_handling}' from environment or parameter.")
+
+    # Respect ENABLE_CONFLICT_DETECTION environment variable
+    enable_conflict_detection = os.getenv("ENABLE_CONFLICT_DETECTION", "true").lower()
+    if enable_conflict_detection not in {"true", "false"}:
+        logger.warning(f"Invalid ENABLE_CONFLICT_DETECTION value '{enable_conflict_detection}' detected. Assuming 'true'.")
+        enable_conflict_detection = "true"
+    if enable_conflict_detection == "false":
+        logger.info("Conflict detection disabled by ENABLE_CONFLICT_DETECTION environment variable. Forcing conflict_handling to 'ignore'.")
+        conflict_handling = "ignore"
 
     def enqueue_task(task):
         try:
@@ -627,6 +658,49 @@ def code_with_multiple_ai(
         # Set default max_workers if not provided
         if max_workers is None:
             max_workers = min(num_prompts, MAX_CONCURRENT_TASKS)
+
+        # Conflict Detection and Handling
+        conflict_info = {"has_conflicts": False, "report": "", "auto_serialized": False}
+        
+        if conflict_handling != "ignore":
+            try:
+                logger.info("Running file conflict detection...")
+                detector = FileConflictDetector(working_dir=working_dir)
+                
+                # Prepare tasks data for conflict detection
+                tasks_data = []
+                for i in range(num_prompts):
+                    tasks_data.append({
+                        "task_id": f"Task-{i+1}",
+                        "editable_files": editable_files_list[i]
+                    })
+                
+                # Detect conflicts
+                conflicts = detector.detect_conflicts(tasks_data)
+                conflict_info["has_conflicts"] = conflicts["has_conflicts"]
+                
+                if conflicts["has_conflicts"]:
+                    # Generate human-readable report
+                    conflict_report = detector.generate_conflict_report(conflicts)
+                    conflict_info["report"] = conflict_report
+                    
+                    logger.warning("File conflicts detected between tasks!")
+                    logger.warning(conflict_report)
+                    
+                    if conflict_handling == "auto":
+                        # Automatically switch to sequential execution
+                        logger.info("Automatically switching to sequential execution due to conflicts.")
+                        parallel = False
+                        conflict_info["auto_serialized"] = True
+                    elif conflict_handling == "warn":
+                        # Just warn but continue with parallel execution
+                        logger.warning("Continuing with parallel execution despite conflicts. Monitor for merge issues.")
+                else:
+                    logger.info("No file conflicts detected. Parallel execution is safe.")
+                    
+            except Exception as e:
+                logger.error(f"Error during conflict detection: {str(e)}. Continuing with original execution plan.")
+                conflict_info["report"] = f"Conflict detection failed: {str(e)}"
 
         # Define a function to process a single prompt with circuit breaker protection
         def process_prompt(i):
@@ -903,7 +977,8 @@ def code_with_multiple_ai(
                     if parallel and execution_duration > 0
                     else 1.0
                 ),
-                "auto_detection_summary": auto_detection_summary
+                "auto_detection_summary": auto_detection_summary,
+                "conflict_info": conflict_info  # NEW: Include conflict detection results
             }
 
             return json.dumps(aggregated_result, indent=4)

@@ -3,10 +3,11 @@
 [![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)]()
 [![Analytics](https://img.shields.io/badge/analytics-triple%20system-blue)]()
 [![Auto-Detection](https://img.shields.io/badge/auto--detection-70%25%20savings-orange)]()
+[![Conflict-Detection](https://img.shields.io/badge/conflict--detection-auto%20prevention-red)]()
 [![Models](https://img.shields.io/badge/models-strategic%20selection-purple)]()
 [![Chunking](https://img.shields.io/badge/logs-monthly%20chunked-green)]()
 
-**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with auto-detection, context extraction, and a comprehensive triple analytics architecture. Built for reliability, performance, and 70% token reduction through smart optimization.
+**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding tasks with auto-detection, context extraction, conflict prevention, and a comprehensive triple analytics architecture. Built for reliability, performance, and 70% token reduction through smart optimization.
 
 ## ✨ Key Features
 
@@ -21,6 +22,14 @@
 - **Automatic target detection** from prompts (hands-free optimization)
 - **Smart context pruning** focuses on relevant code sections only
 - **Comprehensive analytics** track auto-detection performance and savings
+
+### 🔒 **Auto-Conflict Detection** ✨ **NEW**
+- **Intelligent conflict prevention** for parallel task execution
+- **Automatic serialization** when file conflicts are detected
+- **Three handling modes**: auto (default), warn, ignore
+- **Clear user feedback** about conflicts and actions taken
+- **Zero configuration** required - works automatically
+- **Maintains parallelism** for non-conflicting tasks
 
 ### 📊 **Dual Analytics Architecture** ✨ **NEW**
 Specialized systems for comprehensive monitoring:
