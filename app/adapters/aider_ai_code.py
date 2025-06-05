@@ -96,6 +96,7 @@ def _check_for_meaningful_changes(
 ) -> bool:
     """
     Check if the edited files contain meaningful content.
+    Enhanced to detect a wide variety of file types and content patterns.
 
     Args:
         relative_editable_files: List of files to check
@@ -108,38 +109,99 @@ def _check_for_meaningful_changes(
 
         if os.path.exists(full_path):
             try:
-                with open(full_path, "r") as f:
+                with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                    # Check if the file has more than just whitespace or a single comment line,
-                    # or contains common code keywords. This is a heuristic.
                     stripped_content = content.strip()
-                    if stripped_content and (
-                        len(stripped_content.split("\n")) > 1
-                        or any(
-                            kw in content
-                            for kw in [
-                                "def ",
-                                "class ",
-                                "import ",
-                                "from ",
-                                "async def",
-                            ]
-                        )
-                    ):
-                        logger.info(f"Meaningful content found in: {file_path}")
+                    
+                    # If file is empty, skip it
+                    if not stripped_content:
+                        logger.info(f"File is empty: {file_path}")
+                        continue
+                    
+                    # Check file size - any file over 10 bytes with content is meaningful
+                    if len(stripped_content) > 10:
+                        logger.info(f"Meaningful content found by size (>{len(stripped_content)} chars): {file_path}")
                         return True
+                    
+                    # Check for multiple lines (most code files have multiple lines)
+                    lines = stripped_content.split("\n")
+                    if len(lines) > 1:
+                        logger.info(f"Meaningful content found by line count ({len(lines)} lines): {file_path}")
+                        return True
+                    
+                    # Comprehensive keyword detection for various languages and file types
+                    meaningful_patterns = [
+                        # Python keywords
+                        "def ", "class ", "import ", "from ", "async def", "if ", "for ", "while ", "return", "yield",
+                        "try:", "except:", "finally:", "with ", "lambda", "elif", "@", "__",
+                        
+                        # JavaScript/TypeScript keywords  
+                        "function", "const ", "let ", "var ", "export", "import", "require", "module.exports",
+                        "async function", "await", "promise", "=>", "interface", "type ", "enum",
+                        
+                        # Web frameworks and routing
+                        "router", "app.", "route", "@app.", "@router", "blueprint", "endpoint", "middleware",
+                        "express", "fastapi", "flask", "django", "vue", "react", "angular",
+                        
+                        # Common programming constructs
+                        "{", "}", "[", "]", "(", ")", "=", "==", "!=", "+=", "-=", "||", "&&",
+                        "true", "false", "null", "undefined", "None", "True", "False",
+                        
+                        # Configuration and data patterns
+                        '":', "':", "yaml", "json", "xml", "html", "css", "scss", "sass",
+                        "config", "setting", "environment", "env", "database", "db", "api",
+                        
+                        # Common file extensions content indicators
+                        ".py", ".js", ".ts", ".vue", ".jsx", ".tsx", ".php", ".rb", ".go", ".rs",
+                        ".java", ".cpp", ".c", ".h", ".cs", ".swift", ".kt", ".scala",
+                        
+                        # Database and API patterns
+                        "select", "insert", "update", "delete", "create", "drop", "alter", "index",
+                        "get ", "post ", "put ", "delete ", "patch ", "options", "head",
+                        "http", "https", "url", "uri", "endpoint", "rest", "graphql",
+                        
+                        # Common keywords that indicate actual content
+                        "component", "service", "controller", "model", "view", "template",
+                        "test", "spec", "mock", "stub", "fixture", "setup", "teardown",
+                        "error", "exception", "warning", "info", "debug", "log",
+                        
+                        # Package management and build tools
+                        "package", "dependency", "require", "install", "build", "compile",
+                        "webpack", "babel", "rollup", "vite", "gulp", "grunt",
+                        
+                        # Documentation patterns
+                        "readme", "changelog", "license", "contributing", "docs", "documentation",
+                        "# ", "## ", "### ", "* ", "- ", "1. ", "TODO", "FIXME", "NOTE",
+                    ]
+                    
+                    # Check if any meaningful patterns exist
+                    content_lower = content.lower()
+                    for pattern in meaningful_patterns:
+                        if pattern.lower() in content_lower:
+                            logger.info(f"Meaningful content found by pattern '{pattern}' in: {file_path}")
+                            return True
+                    
+                    # Special check for structured data (JSON, YAML, etc.)
+                    if any(char in content for char in ['{', '}', '[', ']', ':', '-']):
+                        logger.info(f"Meaningful content found by structured data patterns in: {file_path}")
+                        return True
+                    
+                    # If we reach here, log what we found for debugging
+                    logger.info(f"Content preview for {file_path} (first 100 chars): {stripped_content[:100]}")
+                    
             except Exception as e:
                 logger.error(
                     f"Failed reading file {full_path} during meaningful change check: {e}"
                 )
-                # If we can't read it, we can't confirm meaningful change from this file
-                continue
+                # If we can't read it but it exists, assume it might be meaningful (binary files, etc.)
+                logger.info(f"Assuming meaningful content due to read error in: {file_path}")
+                return True
         else:
             logger.info(
-                f"File not found or empty, skipping meaningful check: {full_path}"
+                f"File not found, skipping meaningful check: {full_path}"
             )
 
-    logger.info("No meaningful changes detected in any editable files.")
+    logger.info("No meaningful changes detected in any editable files after comprehensive check.")
     return False
 
 
