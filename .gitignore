@@ -25,6 +25,7 @@ costs/
 .aider*
 
 # 📊 Logs and Runtime Files
+ai-logs/
 logs/
 *.log
 *.log.*
