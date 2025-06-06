@@ -238,6 +238,158 @@ def plan_from_scratch(prompt: str) -> str:
     """
 
 
+def resolve_target_elements(
+    target_elements: Optional[List[str]], 
+    file_paths: List[str], 
+    working_dir: str
+) -> List[str]:
+    """
+    Enhanced target resolution system that expands decorator targets to actual function names.
+    
+    For decorator targets (like "mcp.tool", "app.route", etc.), finds all functions with those decorators.
+    Keeps regular function/class targets unchanged. Framework-agnostic.
+    
+    Args:
+        target_elements: List of target elements (functions, classes, or decorators)
+        file_paths: List of file paths to search in
+        working_dir: Working directory for resolving relative paths
+        
+    Returns:
+        Expanded list of actual function/class names found
+    """
+    import re
+    
+    if not target_elements:
+        return []
+    
+    resolved_targets = []
+    decorator_expansions = {}
+    
+    for target in target_elements:
+        is_decorator_target = False
+        expanded_functions = []
+        
+        # Check if this looks like a decorator target (contains dots or common decorator patterns)
+        if ('.' in target or 
+            target.lower() in ['tool', 'route', 'fixture', 'test', 'property', 'staticmethod', 'classmethod']):
+            
+            # Try to find functions decorated with this target across all files
+            for file_path in file_paths:
+                full_path = os.path.join(working_dir, file_path)
+                if not os.path.exists(full_path):
+                    continue
+                    
+                try:
+                    with open(full_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Framework-agnostic decorator patterns
+                    decorator_patterns = [
+                        # Basic patterns: @decorator, @decorator(), @decorator(args)
+                        rf'@{re.escape(target)}\s*(?:\([^)]*\))?\s*\n\s*def\s+(\w+)\s*\(',
+                        # Module patterns: @module.decorator, @module.decorator(), @module.decorator(args)
+                        rf'@{re.escape(target)}\s*(?:\([^)]*\))?\s*\n\s*def\s+(\w+)\s*\(',
+                        # Method chaining: @decorator.method, @decorator.method()
+                        rf'@{re.escape(target)}\.\w+\s*(?:\([^)]*\))?\s*\n\s*def\s+(\w+)\s*\(',
+                    ]
+                    
+                    for pattern in decorator_patterns:
+                        matches = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
+                        if matches:
+                            expanded_functions.extend(matches)
+                            is_decorator_target = True
+                            
+                except Exception as e:
+                    logger.warning(f"Could not read file {full_path} for target resolution: {e}")
+                    continue
+        
+        if is_decorator_target and expanded_functions:
+            # Remove duplicates while preserving order
+            unique_functions = []
+            for func in expanded_functions:
+                if func not in unique_functions:
+                    unique_functions.append(func)
+            
+            resolved_targets.extend(unique_functions)
+            decorator_expansions[target] = unique_functions
+            logger.info(f"🎯 TARGET RESOLUTION: Expanded '{target}' to functions: {unique_functions}")
+        else:
+            # Keep regular function/class targets unchanged
+            resolved_targets.append(target)
+    
+    # Log summary if any expansions occurred
+    if decorator_expansions:
+        total_expanded = sum(len(funcs) for funcs in decorator_expansions.values())
+        logger.info(f"🔍 TARGET RESOLUTION SUMMARY: Expanded {len(decorator_expansions)} decorator targets to {total_expanded} function targets")
+        for decorator, functions in decorator_expansions.items():
+            logger.info(f"   {decorator} → {', '.join(functions)}")
+    
+    return resolved_targets
+
+
+def find_targets_in_file(file_path: str, target_elements: List[str]) -> List[str]:
+    """
+    Find which target elements actually exist in a specific file.
+
+    Args:
+        file_path: Full path to the file to search
+        target_elements: List of function/class/decorator names to find
+
+    Returns:
+        List of target elements that exist in the file
+    """
+    import re
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        found_targets = []
+        for target in target_elements:
+            # Special handling for "mcp.tool" target: find all MCP tool functions decorated with @mcp.tool
+            if target == "mcp.tool":
+                # Find all function names decorated with @mcp.tool
+                tool_pattern = r'@mcp\.tool\(\)\s*\ndef\s+(\w+)\s*\('
+                matches = re.findall(tool_pattern, content, re.MULTILINE)
+                found_targets.extend(matches)
+                continue
+
+            # Build decorator-aware patterns
+            # Support: @decorator, @decorator(), @decorator.method, @module.decorator, @module.decorator(), etc.
+            # Accept compound names (e.g., "pytest.fixture", "app.route", "mcp.tool")
+            decorator_patterns = [
+                rf'@{re.escape(target)}\s*\n',                # @decorator or @module.decorator
+                rf'@{re.escape(target)}\s*\(',                # @decorator( or @module.decorator(
+                rf'@{re.escape(target)}\s*\)\s*\n',           # @decorator() or @module.decorator()
+                rf'@{re.escape(target)}\s*\.\w+\s*\n',        # @decorator.method or @module.decorator.method
+                rf'@{re.escape(target)}\s*\.\w+\s*\(',        # @decorator.method( or @module.decorator.method(
+                rf'@{re.escape(target)}\s*\.\w+\s*\)\s*\n',   # @decorator.method() or @module.decorator.method()
+            ]
+
+            # Existing function/class/JS patterns (unchanged)
+            patterns = [
+                f'def {target}\\(',
+                f'class {target}\\b',
+                f'def {target}\\s*\\(',
+                f'class {target}\\s*[\\(:]',
+                f'function {target}\\(',  # JavaScript
+                f'const {target}\\s*=',   # JavaScript const functions
+                f'let {target}\\s*=',     # JavaScript let functions
+                f'var {target}\\s*=',     # JavaScript var functions
+                f'@{target}\\b',          # Decorator pattern (legacy, keep for compatibility)
+            ] + decorator_patterns
+
+            for pattern in patterns:
+                if re.search(pattern, content, re.IGNORECASE):
+                    found_targets.append(target)
+                    break
+
+        return found_targets
+
+    except Exception as e:
+        logger.warning(f"Could not search for targets in {file_path}: {e}")
+        return []
+
+
 # Add Aider AI coding tool
 @mcp.tool()
 def code_with_ai(
@@ -340,74 +492,112 @@ def code_with_ai(
         start_time = time.time()
         
         # Phase 2.5: Smart Auto-Detection (if target_elements not provided)
+        auto_detected = False
         if not target_elements:
-            auto_detected = get_auto_detected_targets(
+            auto_detected_targets = get_auto_detected_targets(
                 prompt=prompt,
                 file_paths=editable_files,
                 working_dir=working_dir
             )
-            if auto_detected:
-                target_elements = auto_detected
+            if auto_detected_targets:
+                target_elements = auto_detected_targets
+                auto_detected = True
                 logger.info(f"🎯 AUTO-DETECTION SUCCESS: Found targets {target_elements} from prompt")
             else:
                 logger.info("🔍 AUTO-DETECTION: No targets detected, using full file processing")
         
+        # Phase 2.6: Target Resolution (expand decorator targets to actual function names)
+        original_targets = target_elements.copy() if target_elements else None
+        if target_elements and os.getenv("ENABLE_TARGET_RESOLUTION", "true").lower() == "true":
+            try:
+                resolved_targets = resolve_target_elements(
+                    target_elements=target_elements,
+                    file_paths=editable_files,
+                    working_dir=working_dir
+                )
+                if resolved_targets != target_elements:
+                    target_elements = resolved_targets
+                    logger.info(f"🎯 TARGET RESOLUTION: Expanded from {len(original_targets)} to {len(target_elements)} targets")
+                else:
+                    logger.info("🔍 TARGET RESOLUTION: No expansion needed, targets unchanged")
+            except Exception as e:
+                logger.warning(f"⚠️ TARGET RESOLUTION failed: {e}, using original targets")
+        
         # Phase 2: Context-Aware File Pruning (if enabled and target_elements available)
         enhanced_prompt = prompt
         context_processed_files = []
+        context_extraction_used = False
         
         if (target_elements and 
             os.getenv("ENABLE_CONTEXT_EXTRACTION", "false").lower() == "true"):
             try:
+                context_extraction_used = True
                 logger.info("Context extraction enabled, processing files...")
                 
                 # Get configuration
                 max_tokens = int(os.getenv("CONTEXT_DEFAULT_MAX_TOKENS", "4000"))
-                min_relevance = float(os.getenv("CONTEXT_MIN_RELEVANCE_SCORE", "3.0"))
                 
-                # Process each file with context extraction
+                # NEW: Smart target-to-file mapping instead of round-robin
                 context_sections = []
-                for i, file_path in enumerate(editable_files):
+                files_with_targets = []
+                
+                for file_path in editable_files:
                     full_path = os.path.join(working_dir, file_path)
                     
                     if os.path.exists(full_path):
-                        # Get target element for this file (distribute targets across files)
-                        target = target_elements[i % len(target_elements)] if target_elements else None
+                        # Find which target elements exist in this file
+                        targets_for_file = find_targets_in_file(full_path, target_elements)
                         
-                        if target:
+                        if targets_for_file:
                             try:
-                                # Extract focused context using the correct API
+                                # Extract context for the first matching target
+                                primary_target = targets_for_file[0]
                                 context_result = extract_context(
                                     file_path=full_path,
-                                    target_element=target,  # Single element, not list
-                                    max_tokens=max_tokens // len(editable_files)  # Distribute budget
+                                    target_element=primary_target,
+                                    max_tokens=max_tokens // len(editable_files)
                                 )
                                 
                                 if context_result:
-                                    context_info = f"\n--- {file_path} (Focused Context for '{target}') ---\n"
+                                    context_info = f"\n--- {file_path} (Focused Context for '{primary_target}') ---\n"
                                     context_info += context_result + "\n\n"
                                     context_sections.append(context_info)
                                     context_processed_files.append(file_path)
-                                    logger.info(f"Context extracted for {file_path} targeting '{target}'")
+                                    files_with_targets.append(file_path)
+                                    logger.info(f"✅ Context extracted for {file_path} targeting '{primary_target}'")
                                 else:
-                                    logger.warning(f"No relevant context found for {file_path} targeting '{target}'")
+                                    logger.warning(f"⚠️ No relevant context found for {file_path} targeting '{primary_target}'")
                             except Exception as e:
-                                logger.warning(f"Context extraction failed for {file_path} targeting '{target}': {e}")
+                                logger.error(f"❌ Context extraction failed for {file_path} targeting '{primary_target}': {e}")
                                 continue
+                        else:
+                            logger.info(f"ℹ️ No target elements found in {file_path}, skipping context extraction")
                 
                 # Enhance prompt with context if any was extracted
                 if context_sections:
                     enhanced_prompt = f"{prompt}\n\nFocused file context:\n{''.join(context_sections)}"
-                    logger.info(f"💰 CONTEXT EXTRACTION SUCCESS: Enhanced prompt with context from {len(context_processed_files)} files - estimated 70% token reduction")
+                    logger.info(f"💰 CONTEXT EXTRACTION SUCCESS: Enhanced prompt with context from {len(context_processed_files)} files")
                     
-                    # Remove context-processed files from editable_files to avoid duplication
-                    remaining_editable_files = [f for f in editable_files if f not in context_processed_files]
-                    editable_files = remaining_editable_files
+                    # FIXED: Don't remove files, let adapter handle full files alongside context
+                    # This allows for proper diff tracking
+                else:
+                    logger.warning("⚠️ Context extraction enabled but no context was successfully extracted")
+                    context_extraction_used = False
                 
             except Exception as e:
-                logger.warning(f"Context extraction system failed: {e}")
-                # Continue with normal processing
+                logger.error(f"❌ Context extraction system failed: {e}")
+                context_extraction_used = False
                 enhanced_prompt = prompt
+
+        # Track auto-detection metadata for logging
+        auto_detection_metadata = {
+            "auto_detected_targets": target_elements if auto_detected else None,
+            "detection_method": "prompt_analysis" if auto_detected else ("manual" if target_elements else "none"),
+            "context_extraction_used": context_extraction_used,
+            "files_processed_with_context": context_processed_files,
+            "target_elements_provided": bool(target_elements),
+            "original_auto_detected": bool(auto_detected)
+        }
         
         # Call the Aider integration function
         result = code_with_aider(
@@ -417,6 +607,7 @@ def code_with_ai(
             model=model,
             working_dir=working_dir,
             target_elements=target_elements,
+            auto_detection_metadata=auto_detection_metadata  # NEW: Pass metadata
         )
         
         # Phase 2: Record actual cost (if cost tracking enabled)
@@ -1247,6 +1438,133 @@ def export_cost_report(
             "error_type": type(e).__name__
         }
         return json.dumps(error_response, indent=2)
+
+
+@mcp.tool()
+def get_system_health() -> str:
+    """
+    Get a comprehensive health check of the AI coding system by analyzing recent logs.
+    
+    Returns:
+        A JSON string containing the overall health status (healthy/degraded/unhealthy)
+        and a summary of any issues found in recent operations.
+    """
+    try:
+        import json
+        from datetime import datetime, timedelta
+        
+        # Helper function to get log file path
+        def get_log_file_path(base_name: str) -> str:
+            current_month = datetime.utcnow().strftime("%Y-%m")
+            return f"logs/{base_name}_{current_month}.json"
+        
+        # Helper function to load and analyze logs
+        def analyze_recent_logs(log_file: str, hours: int = 24) -> dict:
+            time_threshold = datetime.utcnow() - timedelta(hours=hours)
+            
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                
+                recent_entries = []
+                error_count = 0
+                warning_count = 0
+                
+                for line in lines:
+                    try:
+                        entry = json.loads(line.strip())
+                        timestamp_str = entry.get("timestamp", "").replace('Z', '+00:00')
+                        log_timestamp = datetime.fromisoformat(timestamp_str)
+                        
+                        if log_timestamp >= time_threshold:
+                            recent_entries.append(entry)
+                            level = entry.get("level", "").lower()
+                            if level == "error":
+                                error_count += 1
+                            elif level == "warning":
+                                warning_count += 1
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                
+                return {
+                    "recent_entries": len(recent_entries),
+                    "error_count": error_count,
+                    "warning_count": warning_count,
+                    "latest_errors": [e.get("message", "") for e in recent_entries if e.get("level", "").lower() == "error"][:3]
+                }
+            except FileNotFoundError:
+                return {"error": f"Log file not found: {log_file}"}
+            except Exception as e:
+                return {"error": f"Failed to analyze {log_file}: {str(e)}"}
+        
+        # Analyze operational logs
+        operational_log = get_log_file_path("operational")
+        operational_stats = analyze_recent_logs(operational_log)
+        
+        # Analyze auto-detection logs  
+        auto_detection_log = get_log_file_path("auto_detection")
+        auto_detection_stats = analyze_recent_logs(auto_detection_log)
+        
+        # Determine overall health status
+        overall_status = "healthy"
+        issues = []
+        
+        # Check operational health
+        if "error" in operational_stats:
+            issues.append(f"Operational logs: {operational_stats['error']}")
+            overall_status = "degraded"
+        elif operational_stats.get("error_count", 0) > 0:
+            issues.append(f"Found {operational_stats['error_count']} errors in operational logs")
+            overall_status = "unhealthy"
+        elif operational_stats.get("warning_count", 0) > 5:
+            issues.append(f"High warning count: {operational_stats['warning_count']} warnings")
+            overall_status = "degraded" if overall_status == "healthy" else overall_status
+        
+        # Check auto-detection health
+        if "error" in auto_detection_stats:
+            issues.append(f"Auto-detection logs: {auto_detection_stats['error']}")
+            overall_status = "degraded" if overall_status == "healthy" else overall_status
+        elif auto_detection_stats.get("error_count", 0) > 0:
+            issues.append(f"Found {auto_detection_stats['error_count']} auto-detection errors")
+            overall_status = "unhealthy"
+        
+        # Get latest error details if unhealthy
+        error_details = []
+        if overall_status == "unhealthy":
+            error_details = operational_stats.get("latest_errors", [])
+        
+        health_report = {
+            "status": overall_status,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "summary": {
+                "operational_entries_24h": operational_stats.get("recent_entries", 0),
+                "operational_errors": operational_stats.get("error_count", 0),
+                "operational_warnings": operational_stats.get("warning_count", 0),
+                "auto_detection_entries_24h": auto_detection_stats.get("recent_entries", 0),
+                "auto_detection_errors": auto_detection_stats.get("error_count", 0)
+            },
+            "issues": issues,
+            "recent_errors": error_details[:3] if error_details else []
+        }
+        
+        if overall_status == "healthy":
+            health_report["message"] = "✅ AI coding system is operating normally"
+        elif overall_status == "degraded":
+            health_report["message"] = "⚠️ AI coding system has minor issues but is functional"
+        else:
+            health_report["message"] = "❌ AI coding system has critical issues requiring attention"
+        
+        return json.dumps(health_report, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        error_report = {
+            "status": "unhealthy",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "message": f"❌ Health check system failure: {str(e)}",
+            "error": str(e)
+        }
+        return json.dumps(error_report, indent=2)
 
 
 # Run the server if this file is executed directly

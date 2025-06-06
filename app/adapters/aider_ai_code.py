@@ -219,10 +219,7 @@ def _process_coder_results(
     relative_editable_files: List[str], 
     working_dir: str = None, 
     aider_result: str = None,
-    auto_detected_targets: Optional[List[str]] = None,
-    context_extraction_used: bool = False,
-    files_processed_with_context: Optional[List[str]] = None,
-    original_target_elements: Optional[List[str]] = None
+    auto_detection_metadata: Optional[Dict[str, Any]] = None
 ) -> ResponseDict:
     """
     Process the results after Aider has run, checking for meaningful changes
@@ -256,7 +253,21 @@ def _process_coder_results(
             # Just use the raw output
             implementation_details = aider_result.strip()
 
-    # Create a more detailed response
+    # Use metadata from MCP core
+    if auto_detection_metadata is None:
+        auto_detection_metadata = {
+            "auto_detected_targets": None,
+            "detection_method": "manual",
+            "context_extraction_used": False,
+            "files_processed_with_context": [],
+            "target_elements_provided": False,
+            "original_auto_detected": False
+        }
+
+    # Calculate estimated token reduction
+    estimated_reduction = "60-80%" if auto_detection_metadata.get("context_extraction_used") and auto_detection_metadata.get("files_processed_with_context") else "0%"
+
+    # Create response with correct auto-detection info
     if has_meaningful_content:
         logger.info("Meaningful changes found. Processing successful.")
         response = {
@@ -266,20 +277,17 @@ def _process_coder_results(
             "implementation_notes": implementation_details,
             "files_modified": relative_editable_files,
             "auto_detection_info": {
-                "auto_detected_targets": auto_detected_targets,
-                "context_extraction_used": context_extraction_used,
-                "files_processed_with_context": files_processed_with_context or [],
-                "estimated_token_reduction": "60-80%" if context_extraction_used and files_processed_with_context else "0%",
-                "target_elements_provided": bool(original_target_elements),
-                "target_elements_used": auto_detected_targets or original_target_elements
+                "auto_detected_targets": auto_detection_metadata.get("auto_detected_targets"),
+                "context_extraction_used": auto_detection_metadata.get("context_extraction_used"),
+                "files_processed_with_context": auto_detection_metadata.get("files_processed_with_context", []),
+                "estimated_token_reduction": estimated_reduction,
+                "target_elements_provided": auto_detection_metadata.get("target_elements_provided"),
+                "target_elements_used": auto_detection_metadata.get("auto_detected_targets")
             }
         }
         return response
     else:
-        logger.warning(
-            "No meaningful changes detected. Processing marked as unsuccessful."
-        )
-        # Even if no meaningful content, provide the diff/content if available
+        logger.warning("No meaningful changes detected. Processing marked as unsuccessful.")
         response = {
             "success": False,
             "diff": diff_output or "No meaningful changes detected and no diff/content available.",
@@ -287,12 +295,12 @@ def _process_coder_results(
             "implementation_notes": implementation_details,
             "files_attempted": relative_editable_files,
             "auto_detection_info": {
-                "auto_detected_targets": auto_detected_targets,
-                "context_extraction_used": context_extraction_used,
-                "files_processed_with_context": files_processed_with_context or [],
-                "estimated_token_reduction": "60-80%" if context_extraction_used and files_processed_with_context else "0%",
-                "target_elements_provided": bool(original_target_elements),
-                "target_elements_used": auto_detected_targets or original_target_elements
+                "auto_detected_targets": auto_detection_metadata.get("auto_detected_targets"),
+                "context_extraction_used": auto_detection_metadata.get("context_extraction_used"),
+                "files_processed_with_context": auto_detection_metadata.get("files_processed_with_context", []),
+                "estimated_token_reduction": estimated_reduction,
+                "target_elements_provided": auto_detection_metadata.get("target_elements_provided"),
+                "target_elements_used": auto_detection_metadata.get("auto_detected_targets")
             }
         }
         return response
@@ -315,24 +323,28 @@ def code_with_aider(
     ai_coding_prompt: str,
     relative_editable_files: List[str],
     relative_readonly_files: List[str],
-    model: str = None,  # Made optional for strategic selection
+    model: str = None,
     working_dir: str = None,
-    target_elements: Optional[List[str]] = None,  # NEW: Context extraction targets
+    target_elements: Optional[List[str]] = None,
+    auto_detection_metadata: Optional[Dict[str, Any]] = None,  # NEW: Pass metadata from MCP
 ) -> str:
     """
     Run Aider to perform AI coding tasks based on the provided prompt and files.
-    This implementation uses a custom wrapper around the aider CLI tool.
+    
+    NOTE: Auto-detection and context extraction are now handled by MCP core.
+    This function focuses solely on running Aider with the provided inputs.
 
     Args:
         ai_coding_prompt (str): The prompt for the AI to execute.
         relative_editable_files (List[str]): List of files that can be edited.
-        relative_readonly_files (List[str], optional): List of files that can be read but not edited. Defaults to [].
+        relative_readonly_files (List[str]): List of files that can be read but not edited.
         model (str): The model to use.
-        working_dir (str, required): The working directory where git repository is located and files are stored.
+        working_dir (str): The working directory where git repository is located and files are stored.
         target_elements (Optional[List[str]]): List of specific functions/classes/methods to focus on for context extraction.
+        auto_detection_metadata (Optional[Dict[str, Any]]): Metadata from MCP core about auto-detection results.
 
     Returns:
-        Dict[str, Any]: {'success': True/False, 'diff': str with git diff output}
+        JSON string with results including success status and diff output
     """
     # Working directory must be provided
     if not working_dir:
@@ -340,15 +352,13 @@ def code_with_aider(
         logger.error(error_msg)
         return json.dumps({"success": False, "diff": error_msg})
     
-    # Generate task ID and extract task name for auto-detection logging
+    # Generate task ID and extract task name for logging
     task_id = str(uuid.uuid4())[:8]
     task_name = ai_coding_prompt[:50] + "..." if len(ai_coding_prompt) > 50 else ai_coding_prompt
     task_name = task_name.replace('\n', ' ').strip()
     
-    # Start timing for auto-detection analytics
+    # Start timing
     operation_start_time = time.time()
-    auto_detection_start_time = None
-    context_extraction_start_time = None
     
     # Consolidated session start logging
     log_structured(logger, logging.INFO, "Starting Aider coding session",
@@ -361,9 +371,16 @@ def code_with_aider(
     # Store the current directory
     original_dir = os.getcwd()
     
-    # Track auto-detection information
-    auto_detected_targets = None
-    context_extraction_used = False
+    # Use metadata from MCP core (no duplicate processing)
+    if auto_detection_metadata is None:
+        auto_detection_metadata = {
+            "auto_detected_targets": None,
+            "detection_method": "manual" if target_elements else "none",
+            "context_extraction_used": False,
+            "files_processed_with_context": [],
+            "target_elements_provided": bool(target_elements),
+            "original_auto_detected": False
+        }
     files_processed_with_context = []
     original_target_elements = target_elements.copy() if target_elements else None
 
@@ -372,81 +389,8 @@ def code_with_aider(
         os.chdir(working_dir)
         logger.info(f"Changed to working directory: {working_dir}")
 
-        # Phase 2.5: Smart Auto-Detection (if target_elements not provided)
-        if not target_elements:
-            auto_detection_start_time = time.time()
-            auto_detected = get_auto_detected_targets(
-                prompt=ai_coding_prompt,
-                file_paths=relative_editable_files,
-                working_dir=working_dir
-            )
-            if auto_detected:
-                target_elements = auto_detected
-                auto_detected_targets = auto_detected  # Track what was auto-detected
-                logger.info(f"Auto-detected targets from prompt: {target_elements}")
-
-        # Context-Aware File Pruning (if enabled and target_elements available)
-        enhanced_prompt = ai_coding_prompt
-        context_processed_files = []
-        
-        if (target_elements and 
-            os.getenv("ENABLE_CONTEXT_EXTRACTION", "false").lower() == "true"):
-            try:
-                context_extraction_start_time = time.time()
-                context_extraction_used = True  # Mark that context extraction is being used
-                logger.info("Context extraction enabled for aider, processing files...")
-                
-                # Get configuration
-                max_tokens = int(os.getenv("CONTEXT_DEFAULT_MAX_TOKENS", "4000"))
-                min_relevance = float(os.getenv("CONTEXT_MIN_RELEVANCE_SCORE", "3.0"))
-                
-                # Process each file with context extraction
-                context_sections = []
-                for i, file_path in enumerate(relative_editable_files):
-                    full_path = os.path.join(working_dir, file_path)
-                    
-                    if os.path.exists(full_path):
-                        # Get target element for this file
-                        target = target_elements[i % len(target_elements)] if target_elements else None
-                        
-                        if target:
-                            try:
-                                # Extract focused context using the correct API
-                                context_result = extract_context(
-                                    file_path=full_path,
-                                    target_element=target,  # Single element, not list
-                                    max_tokens=max_tokens // len(relative_editable_files)  # Distribute budget
-                                )
-                                
-                                if context_result:
-                                    context_info = f"\n--- {file_path} (Focused Context for '{target}') ---\n"
-                                    context_info += context_result + "\n\n"
-                                    context_sections.append(context_info)
-                                    context_processed_files.append(file_path)
-                                    files_processed_with_context.append(file_path)  # Track for auto-detection info
-                                    logger.info(f"Context extracted for {file_path} targeting '{target}'")
-                                else:
-                                    logger.warning(f"No relevant context found for {file_path} targeting '{target}'")
-                            except Exception as e:
-                                logger.warning(f"Context extraction failed for {file_path} targeting '{target}': {e}")
-                                continue
-                
-                # Enhance prompt with context if any was extracted
-                if context_sections:
-                    enhanced_prompt = f"{ai_coding_prompt}\n\nFocused file context:\n{''.join(context_sections)}"
-                    logger.info(f"Enhanced aider prompt with context from {len(context_processed_files)} files")
-                    
-                    # Remove context-processed files from editable_files to avoid duplication
-                    remaining_editable_files = [f for f in relative_editable_files if f not in context_processed_files]
-                    relative_editable_files = remaining_editable_files
-                
-            except Exception as e:
-                logger.warning(f"Context extraction system failed in aider: {e}")
-                # Continue with normal processing
-                enhanced_prompt = ai_coding_prompt
-
-        # Strategic model selection - use optimal model for the task
-        selected_model = get_optimal_model(enhanced_prompt, model)
+        # Strategic model selection (prompt already enhanced by MCP core if needed)
+        selected_model = get_optimal_model(ai_coding_prompt, model)
         logger.info(f"Strategic model selection: '{selected_model}' for prompt: {ai_coding_prompt[:50]}...")
 
         # Configure the model
@@ -483,25 +427,22 @@ def code_with_aider(
         )
         logger.debug("Aider coder instance created successfully.")
 
-        # Run the coding session using the CLI
-        aider_result = coder.run(enhanced_prompt)
+        # Run the coding session (prompt already enhanced by MCP core if needed)
+        aider_result = coder.run(ai_coding_prompt)
         
         # Consolidated session completion logging
         log_structured(logger, logging.INFO, "Aider coding session completed",
                       result_length=len(aider_result),
                       success=True)
 
-        # Process the results after the coder has run
+        # Process the results
         logger.info("Processing coder results...")
         try:
             response = _process_coder_results(
                 relative_editable_files,
                 working_dir,
                 aider_result,
-                auto_detected_targets,
-                context_extraction_used,
-                files_processed_with_context,
-                original_target_elements
+                auto_detection_metadata
             )
             logger.info("Coder results processed.")
         except Exception as e:
@@ -512,14 +453,7 @@ def code_with_aider(
                 "details": "An error occurred while processing the results.",
                 "error": str(e),
                 "files_attempted": relative_editable_files,
-                "auto_detection_info": {
-                    "auto_detected_targets": auto_detected_targets,
-                    "context_extraction_used": context_extraction_used,
-                    "files_processed_with_context": files_processed_with_context or [],
-                    "estimated_token_reduction": "60-80%" if context_extraction_used and files_processed_with_context else "0%",
-                    "target_elements_provided": bool(original_target_elements),
-                    "target_elements_used": auto_detected_targets or original_target_elements
-                }
+                "auto_detection_info": auto_detection_metadata
             }
 
     except Exception as e:
@@ -531,14 +465,7 @@ def code_with_aider(
             "error": str(e),
             "error_type": type(e).__name__,
             "files_attempted": relative_editable_files,
-            "auto_detection_info": {
-                "auto_detected_targets": auto_detected_targets if 'auto_detected_targets' in locals() else None,
-                "context_extraction_used": context_extraction_used if 'context_extraction_used' in locals() else False,
-                "files_processed_with_context": files_processed_with_context if 'files_processed_with_context' in locals() else [],
-                "estimated_token_reduction": "0%",
-                "target_elements_provided": bool(original_target_elements) if 'original_target_elements' in locals() else False,
-                "target_elements_used": None
-            }
+            "auto_detection_info": auto_detection_metadata
         }
     finally:
         # Restore original directory
@@ -547,52 +474,40 @@ def code_with_aider(
 
     formatted_response = _format_response(response)
     
-    # Log auto-detection event for analytics
+    # Log auto-detection event with CORRECT data
     try:
         operation_end_time = time.time()
         total_duration = operation_end_time - operation_start_time
         
-        # Calculate timing breakdown
-        auto_detection_time_ms = 0
-        context_extraction_time_ms = 0
+        # Calculate estimated token reduction
+        estimated_reduction = "60-80%" if auto_detection_metadata.get("context_extraction_used") and auto_detection_metadata.get("files_processed_with_context") else "0%"
         
-        if auto_detection_start_time:
-            # If context extraction happened, auto-detection time is until context extraction started
-            end_time = context_extraction_start_time if context_extraction_start_time else operation_end_time
-            auto_detection_time_ms = (end_time - auto_detection_start_time) * 1000
-        
-        if context_extraction_start_time:
-            context_extraction_time_ms = (operation_end_time - context_extraction_start_time) * 1000
-        
-        # Extract auto-detection info from response
-        response_data = json.loads(formatted_response) if isinstance(formatted_response, str) else formatted_response
-        auto_info = response_data.get("auto_detection_info", {})
-        
-        # Prepare auto-detection results
+        # Prepare auto-detection results with CORRECT data
         auto_detection_results = {
-            "targets_detected": auto_info.get("auto_detected_targets", []),
-            "detection_method": "prompt_analysis" if auto_detected_targets else "manual",
-            "context_extraction_used": auto_info.get("context_extraction_used", False),
-            "files_processed": auto_info.get("files_processed_with_context", []),
-            "estimated_token_reduction": auto_info.get("estimated_token_reduction", "0%"),
-            "target_elements_provided": auto_info.get("target_elements_provided", False),
-            "target_elements_used": auto_info.get("target_elements_used", [])
+            "targets_detected": auto_detection_metadata.get("auto_detected_targets"),
+            "detection_method": auto_detection_metadata.get("detection_method", "manual"),
+            "context_extraction_used": auto_detection_metadata.get("context_extraction_used", False),
+            "files_processed": auto_detection_metadata.get("files_processed_with_context", []),
+            "estimated_token_reduction": estimated_reduction,
+            "target_elements_provided": auto_detection_metadata.get("target_elements_provided", False),
+            "target_elements_used": target_elements or auto_detection_metadata.get("auto_detected_targets")
         }
         
         # Prepare performance impact metrics
+        response_data = json.loads(formatted_response) if isinstance(formatted_response, str) else formatted_response
         performance_impact = {
-            "detection_time_ms": round(auto_detection_time_ms, 2),
-            "context_extraction_time_ms": round(context_extraction_time_ms, 2),
-            "total_overhead_ms": round(auto_detection_time_ms + context_extraction_time_ms, 2),
+            "detection_time_ms": 0,  # Detection now happens in MCP core
+            "context_extraction_time_ms": total_duration * 1000,  # Full operation time
+            "total_overhead_ms": total_duration * 1000,
             "operation_success": response_data.get("success", False)
         }
         
-        # Log the auto-detection event
+        # Log the auto-detection event with CORRECT data
         log_auto_detection_event(
             task_id=task_id,
             task_name=task_name,
             operation_type="code_with_aider",
-            model=model if model else "unknown",
+            model=selected_model,
             duration_seconds=round(total_duration, 3),
             auto_detection_results=auto_detection_results,
             performance_impact=performance_impact
