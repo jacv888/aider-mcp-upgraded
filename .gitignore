@@ -33,6 +33,7 @@ logs/
 # 🗃️ Backup Files
 backup_20250606_185053/
 backup/
+archive/
 *.bak
 *.backup
 
