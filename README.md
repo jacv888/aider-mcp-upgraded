@@ -490,7 +490,7 @@ python app/scripts/generate_claude_config.py
 
 ```bash
 # 🛠️ MCP SERVER CONFIGURATION
-MCP_SERVER_ROOT=/Users/jacquesv/mcp/aider-mcp    # Project root path
+MCP_SERVER_ROOT=/Users/jacquesv/MCP/aider-mcp    # Project root path
 MCP_SERVER_ENTRY_POINT=app/core/aider_mcp.py    # Server entry point
 UV_PATH=/Users/jacquesv/.local/bin/uv           # UV binary path
 ```
@@ -677,6 +677,25 @@ code_with_multiple_ai(
 ## 🐛 Troubleshooting
 
 ### Common Issues
+
+#### Path Configuration Issues ✨ **NEW**
+```bash
+# If code_with_ai fails with "TypeError: Cannot convert undefined or null to object"
+# Check that MCP_SERVER_ROOT in .env matches your actual project path
+
+# Verify .env configuration
+cat .env | grep MCP_SERVER_ROOT
+# Should show: MCP_SERVER_ROOT=/Users/yourname/MCP/aider-mcp (note: uppercase MCP)
+
+# Check if UV is accessible
+ls -la $(grep UV_PATH .env | cut -d'=' -f2)
+
+# If paths are incorrect, run setup again
+./app/scripts/setup.sh
+
+# Or manually fix .env
+# Edit .env and correct the MCP_SERVER_ROOT path to match your actual directory
+```
 
 #### Connection Disconnections
 ```bash

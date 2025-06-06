@@ -14,7 +14,17 @@ from app.core.logging import get_logger, log_structured, log_auto_detection_even
 # Load environment variables with MCP aider-mcp as primary source
 load_dotenv()  # Load from current directory (lowest priority)
 load_dotenv(os.path.expanduser("~/.config/aider/.env"))  # Load global config (medium priority)
-load_dotenv("/Users/jacquesv/mcp/aider-mcp/.env", override=True)  # PRIMARY source (highest priority)
+
+# Load project-level config (highest priority) - use MCP_SERVER_ROOT if available
+project_root = os.getenv("MCP_SERVER_ROOT")
+if project_root and os.path.exists(os.path.join(project_root, ".env")):
+    load_dotenv(os.path.join(project_root, ".env"), override=True)
+else:
+    # Fallback to current directory's parent .env
+    current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_env = os.path.join(current_dir, ".env")
+    if os.path.exists(project_env):
+        load_dotenv(project_env, override=True)
 
 # Import strategic model selector
 from app.models.strategic_model_selector import get_optimal_model
