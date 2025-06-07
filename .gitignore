@@ -32,6 +32,8 @@ logs/
 *.log.*
 
 # 🗃️ Backup Files
+backup_readme/
+backups/
 prompts/backup/
 readme-backups/
 costs_DEPRECATED_20250607/
