@@ -5,7 +5,7 @@
 [![Frameworks](https://img.shields.io/badge/frameworks-Python%20%7C%20JS%20%7C%20TS-blue)]()
 [![Parallel](https://img.shields.io/badge/parallel-2.5x%20speedup-purple)]()
 
-**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding with universal auto-detection across Python, JavaScript, and TypeScript. Features 70% token reduction through smart context extraction, strategic model selection, and comprehensive cost management.
+**Aider-MCP** is a production-grade MCP server that enables intelligent, parallel AI coding with universal auto-detection across Python, JavaScript, and TypeScript. Features 70% token reduction through smart context extraction, strategic model selection, and comprehensive monitoring.
 
 ## ✨ Key Features
 
@@ -25,15 +25,15 @@
 - **Auto-conflict detection** prevents file collisions
 - **Resource management** with configurable limits
 
-### 💰 **Complete Cost Management**
-- **Real-time tracking** with budget limits ($5/task, $50/day, $500/month)
-- **Pre-flight estimation** before expensive operations
-- **Monthly analytics** with automatic report generation
-
 ### 🏥 **Health Monitoring**
 - **System health checks** via `get_system_health()` tool
 - **24-hour analysis** of operational logs
 - **Three-tier status**: healthy/degraded/unhealthy
+
+### 📊 **Real-Time Metrics**
+- **Auto-detection tracking** with measured token savings
+- **Session bootstrap** with comprehensive metrics display
+- **Monthly log rotation** with structured JSON logging
 
 ## 🚀 Quick Start
 
@@ -57,7 +57,6 @@ cp .env.example .env
 # Update Claude Desktop config
 python app/scripts/update_claude_config.py
 ```
-
 ## 💡 Usage Examples
 
 ### Single AI Task with Auto-Detection
@@ -97,22 +96,6 @@ code_with_multiple_ai(
         ["tests/test_user.py"]
     ]
 )
-```
-
-### Cost Management
-```python
-# Check costs and budget
-get_cost_summary(days=7)
-get_budget_status()
-
-# Estimate before running
-estimate_task_cost(
-    prompt="Create React dashboard with multiple components",
-    file_paths=["src/Dashboard.tsx", "src/components/"]
-)
-
-# Export monthly reports
-export_cost_report(format="csv", days=30)
 ```
 
 ### Health Monitoring
@@ -178,11 +161,6 @@ ENABLE_CONTEXT_EXTRACTION=true
 ENABLE_AUTO_TARGET_DETECTION=true
 ENABLE_JS_TS_AUTO_DETECTION=true
 
-# Budget Management
-MAX_COST_PER_TASK=5.00
-MAX_DAILY_COST=50.00
-MAX_MONTHLY_COST=500.00
-
 # Server Paths
 MCP_SERVER_ROOT=/path/to/aider-mcp
 UV_PATH=/path/to/uv
@@ -202,57 +180,12 @@ Leave `AIDER_MODEL` empty for automatic optimization, or specify:
 | **Parallel Speedup** | 2.5x for multiple tasks |
 | **Task Success Rate** | 100% (production tested) |
 | **Framework Coverage** | Python + JavaScript + TypeScript |
-| **Cost Efficiency** | Strategic model selection |
 | **Auto-Detection Accuracy** | 95%+ target identification |
 
-## 🔧 Advanced Features
-
-### Auto-Conflict Detection
-```python
-# Automatically prevents file conflicts in parallel tasks
-code_with_multiple_ai(
-    prompts=["Task 1", "Task 2"],
-    editable_files_list=[["same_file.py"], ["same_file.py"]],
-    conflict_handling="auto"  # Serializes conflicting tasks
-)
-```
-
-### Custom Model Override
-```python
-# Force specific model when needed
-code_with_ai(
-    prompt="Complex algorithm optimization",
-    editable_files=["algorithm.py"],
-    model="claude-3-5-sonnet-20241022"
-)
-```
-
-### Batch Processing with Health Checks
-```python
-def safe_batch_processing(tasks):
-    for i, task in enumerate(tasks):
-        if i % 5 == 0:  # Health check every 5 tasks
-            health = json.loads(get_system_health())
-            if health["status"] == "unhealthy":
-                return {"halted_at": i, "reason": health["message"]}
-        
-        result = code_with_ai(**task)
-        yield result
-```
-
-## 🛡️ Production Features
-
-### Resilience System
-- **Connection monitoring** with automatic reconnection
-- **Resource limits** (CPU/memory thresholds)
-- **Circuit breaker** prevents cascade failures
-- **Task queue management** with overflow protection
-
-### Data Management
-- **Monthly log chunking** prevents large files
-- **Automatic archival** of operational data
-- **Git-safe** cost directory (excluded from version control)
-- **Cross-system analytics** with unified time windows
+### Data Location
+- **Logs**: `/logs/current/operational_2025-06.json` (active monthly logs)
+- **Archive**: `/logs/archive/` (legacy logs) 
+- **Reports**: On-demand CSV/JSON exports
 
 ## 🐛 Troubleshooting
 
@@ -275,34 +208,6 @@ get_system_health()
 - **Zod**: Schema variables should contain "schema" or "Schema"
 - **TypeScript**: Interface names should follow TypeScript conventions
 - **Next.js**: API route detection requires proper file structure
-
-## 📈 Analytics & Reporting
-
-### Cost Analytics
-```python
-# Daily monitoring
-get_cost_summary(days=1)        # Today's costs
-get_budget_status()             # Remaining budget
-
-# Monthly reporting  
-export_cost_report(format="csv", days=30)
-export_cost_report(format="json", days=7)
-```
-
-### Performance Analytics
-```bash
-# System performance reports
-python -m app.analytics.metrics_extractor --report=summary
-python -m app.analytics.metrics_extractor --report=performance
-
-# Health monitoring
-get_system_health()  # Real-time health status
-```
-
-### Data Location
-- **Logs**: `/logs/current/operational_2025-06.json` (active monthly logs)
-- **Archive**: `/logs/archive/` (legacy logs) 
-- **Reports**: On-demand CSV/JSON exports
 
 ## 🤝 Contributing
 
