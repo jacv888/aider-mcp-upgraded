@@ -125,12 +125,12 @@ Configure optimal models for different task types:
 ```bash
 # 🧠 COMPLEXITY-BASED ROUTING
 AIDER_MODEL_HARD=gpt-4.1-2025-04-14                    # Complex algorithms
-AIDER_MODEL_COMPLEX=gemini/gemini-2.5-pro-preview-05-06 # Advanced reasoning  
+AIDER_MODEL_COMPLEX=gemini/gemini-2.5-pro-preview-05-06 # Advanced reasoning
 AIDER_MODEL_MEDIUM=gemini/gemini-2.5-flash-preview-05-20 # Balanced tasks
 AIDER_MODEL_EASY=gpt-4.1-mini-2025-04-14               # Simple implementations
 AIDER_MODEL_SIMPLE=gpt-4.1-nano-2025-04-14             # Quick fixes
 
-# 🛠️ TASK-TYPE OPTIMIZATION  
+# 🛠️ TASK-TYPE OPTIMIZATION
 AIDER_MODEL_WRITING=anthropic/claude-sonnet-4-20250514  # Documentation
 AIDER_MODEL_TESTING=gpt-4.1-mini-2025-04-14            # Test generation
 AIDER_MODEL_REFACTOR=anthropic/claude-sonnet-4-20250514 # Code refactoring
@@ -146,7 +146,7 @@ AIDER_MODEL_DJANGO=gpt-4.1-mini-2025-04-14      # Django models, views
 AIDER_MODEL_FASTAPI=gpt-4.1-mini-2025-04-14     # FastAPI endpoints
 AIDER_MODEL_FLASK=gpt-4.1-mini-2025-04-14       # Flask routes
 
-# ⚛️ JAVASCRIPT/TYPESCRIPT FRAMEWORKS  
+# ⚛️ JAVASCRIPT/TYPESCRIPT FRAMEWORKS
 AIDER_MODEL_REACT=gpt-4.1-mini-2025-04-14       # React components
 AIDER_MODEL_NEXTJS=gpt-4.1-mini-2025-04-14      # Next.js App Router
 AIDER_MODEL_TYPESCRIPT=gpt-4.1-mini-2025-04-14  # TypeScript interfaces
@@ -202,7 +202,9 @@ python app/scripts/update_claude_config.py
 ```bash
 # Copy these files to Claude Desktop Project Instructions:
 # prompts/context-management-engine_v4.md → Session automation & context
+{MCP_SERVER_ROOT}=/Users/user/mcps/aider-mcp/
 # prompts/project-system-instructions_v8.md → Multi-agent workflow optimization
+{WORKSPACE_DIR=}=/Users/user/projects/my-project/
 ```
 
 #### **8. Verify Multi-Agent Setup**
