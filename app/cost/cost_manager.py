@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from app.core.logging import get_logger, log_structured
+from app.core.config import get_config # Added import
 
 # Get logger
 logger = get_logger(__name__, "operational")
@@ -73,50 +74,80 @@ class CostManager:
             self.cost_storage = None
         
     def _load_pricing_database(self) -> Dict[str, Dict[str, float]]:
-        """Load model pricing information from environment variables."""
-        return {
-            # OpenAI GPT-4.1 models
-            "gpt-4.1-2025-04-14": {
-                "input": float(os.getenv("GPT_4_1_INPUT_PRICE", "30.00")),
-                "output": float(os.getenv("GPT_4_1_OUTPUT_PRICE", "60.00"))
-            },
-            "gpt-4.1-mini-2025-04-14": {
-                "input": float(os.getenv("GPT_4_1_MINI_INPUT_PRICE", "0.15")),
-                "output": float(os.getenv("GPT_4_1_MINI_OUTPUT_PRICE", "0.60"))
-            },
-            "gpt-4.1-nano-2025-04-14": {
-                "input": float(os.getenv("GPT_4_1_NANO_INPUT_PRICE", "0.05")),
-                "output": float(os.getenv("GPT_4_1_NANO_OUTPUT_PRICE", "0.20"))
-            },
-            
-            # Gemini models
-            "gemini/gemini-2.5-pro-preview-05-06": {
-                "input": float(os.getenv("GEMINI_PRO_INPUT_PRICE", "2.50")),
-                "output": float(os.getenv("GEMINI_PRO_OUTPUT_PRICE", "10.00"))
-            },
-            "gemini/gemini-2.5-flash-preview-05-20": {
-                "input": float(os.getenv("GEMINI_FLASH_INPUT_PRICE", "0.20")),
-                "output": float(os.getenv("GEMINI_FLASH_OUTPUT_PRICE", "0.40"))
-            },
-            
-            # Anthropic Claude models
-            "anthropic/claude-sonnet-4-20250514": {
-                "input": float(os.getenv("CLAUDE_SONNET_4_INPUT_PRICE", "15.00")),
-                "output": float(os.getenv("CLAUDE_SONNET_4_OUTPUT_PRICE", "75.00"))
-            },
-            "claude-sonnet-4-20250514": {
-                "input": float(os.getenv("CLAUDE_SONNET_4_INPUT_PRICE", "15.00")),
-                "output": float(os.getenv("CLAUDE_SONNET_4_OUTPUT_PRICE", "75.00"))
+        """Load model pricing information from the Config class."""
+        config = get_config()
+        pricing_data = {}
+        
+        # Default pricing for unknown models, if not specified in config
+        default_input_price = 30.00
+        default_output_price = 60.00
+
+        if config.models and hasattr(config.models, 'pricing') and config.models.pricing:
+            for model_name, pricing_entry in config.models.pricing.items():
+                try:
+                    input_price = float(pricing_entry.input)
+                    output_price = float(pricing_entry.output)
+                    pricing_data[model_name] = {
+                        "input": input_price,
+                        "output": output_price
+                    }
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Invalid pricing data for model '{model_name}' in config: {e}. Using defaults.")
+                    pricing_data[model_name] = {
+                        "input": default_input_price,
+                        "output": default_output_price
+                    }
+        else:
+            logger.warning("Model pricing configuration not found. Using hardcoded defaults.")
+            # Fallback to hardcoded defaults if config.models.pricing is empty or missing
+            pricing_data = {
+                "gpt-4.1-2025-04-14": {"input": 30.00, "output": 60.00},
+                "gpt-4.1-mini-2025-04-14": {"input": 0.15, "output": 0.60},
+                "gpt-4.1-nano-2025-04-14": {"input": 0.05, "output": 0.20},
+                "gemini/gemini-2.5-pro-preview-05-06": {"input": 2.50, "output": 10.00},
+                "gemini/gemini-2.5-flash-preview-05-20": {"input": 0.20, "output": 0.40},
+                "anthropic/claude-sonnet-4-20250514": {"input": 15.00, "output": 75.00},
+                "claude-sonnet-4-20250514": {"input": 15.00, "output": 75.00}
             }
-        }    
+        return pricing_data
+    
     def _load_budget_configuration(self) -> Dict[str, float]:
-        """Load budget limits from environment variables."""
-        return {
-            "max_cost_per_task": float(os.getenv("MAX_COST_PER_TASK", "5.00")),
-            "max_daily_cost": float(os.getenv("MAX_DAILY_COST", "50.00")),
-            "max_monthly_cost": float(os.getenv("MAX_MONTHLY_COST", "500.00")),
-            "warning_threshold": float(os.getenv("COST_WARNING_THRESHOLD", "1.00"))
-        }
+        """Load budget limits from the Config class."""
+        config = get_config()
+        budget = {}
+        
+        # Default values
+        default_max_task = 5.00
+        default_max_daily = 50.00
+        default_max_monthly = 500.00
+        default_warn_threshold = 1.00
+
+        if config.cost:
+            budget["max_cost_per_task"] = getattr(config.cost, 'max_cost_per_task_usd', default_max_task)
+            budget["max_daily_cost"] = getattr(config.cost, 'max_daily_cost_usd', default_max_daily)
+            budget["max_monthly_cost"] = getattr(config.cost, 'max_monthly_cost_usd', default_max_monthly)
+            budget["warning_threshold"] = getattr(config.cost, 'warn_threshold_usd', default_warn_threshold)
+        else:
+            logger.warning("Cost budget configuration not found. Using hardcoded defaults.")
+            budget = {
+                "max_cost_per_task": default_max_task,
+                "max_daily_cost": default_max_daily,
+                "max_monthly_cost": default_max_monthly,
+                "warning_threshold": default_warn_threshold
+            }
+        
+        # Ensure all values are floats
+        for key, value in budget.items():
+            try:
+                budget[key] = float(value)
+            except (TypeError, ValueError):
+                logger.error(f"Invalid budget value for {key}: {value}. Setting to default.")
+                if key == "max_cost_per_task": budget[key] = default_max_task
+                elif key == "max_daily_cost": budget[key] = default_max_daily
+                elif key == "max_monthly_cost": budget[key] = default_max_monthly
+                elif key == "warning_threshold": budget[key] = default_warn_threshold
+        
+        return budget
     
     def get_token_encoder(self, model: str):
         """Get or create token encoder for model."""

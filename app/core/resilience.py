@@ -1,7 +1,6 @@
 import threading
 import queue
 import time
-import os
 import logging
 import psutil
 from collections import deque
@@ -10,75 +9,42 @@ from typing import Callable, Any, Optional, Dict, Set
 # Assume get_logger is available or define a simple one for standalone
 try:
     from app.core.logging import get_logger
+    from app.core.config import get_config
 except ImportError:
-    # Fallback for standalone testing or if logging module is not yet integrated
+    # Fallback for standalone testing or if logging/config modules are not yet integrated
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     def get_logger(name, log_category="operational"):
         return logging.getLogger(name)
+    
+    # Dummy Config for fallback
+    class DummyResilienceConfig:
+        heartbeat_enabled = False
+        heartbeat_interval_seconds = 60
+        heartbeat_timeout_seconds = 180
+        resource_monitoring_enabled = False
+        resource_monitoring_interval_seconds = 30
+        max_memory_percent = 80
+        max_cpu_percent = 90
+        degraded_mode_threshold = 70
+        task_queue_enabled = False
+        max_concurrent_tasks = 5
+        queue_timeout_seconds = 10
+        enable_circuit_breaker = False
+        circuit_breaker_max_failures = 3
+        circuit_breaker_reset_time_sec = 300
+        enable_auto_recovery = False
+        auto_recovery_initial_delay_sec = 60
+        performance_metrics_enabled = False
+        performance_window_size = 100
+
+    class DummyConfig:
+        resilience = DummyResilienceConfig()
+
+    def get_config():
+        return DummyConfig()
+
 
 logger = get_logger("resilience_manager", "operational")
-
-# Default configuration for resilience features
-DEFAULT_RESILIENCE_CONFIG = {
-    "heartbeat": {
-        "enabled": True,
-        "interval_seconds": 60,
-        "timeout_seconds": 180,
-    },
-    "resource_monitoring": {
-        "enabled": True,
-        "interval_seconds": 30,
-        "max_memory_percent": 80,
-        "max_cpu_percent": 90,
-        "degraded_mode_threshold": 70, # % of max_memory/cpu before degraded mode is triggered
-    },
-    "task_queue": {
-        "enabled": True,
-        "max_concurrent_tasks": 5,
-        "queue_timeout_seconds": 10, # Timeout for workers trying to get tasks from queue
-    },
-    "circuit_breaker": {
-        "enabled": True,
-        "failure_threshold": 3,
-        "reset_time_seconds": 300,
-    },
-    "auto_recovery": {
-        "enabled": True,
-        "reconnect_interval_seconds": 60,
-    },
-    "performance_metrics": {
-        "enabled": True,
-        "window_size": 100, # Number of recent task durations to keep
-    }
-}
-
-# Helper to get config values, respecting environment variables
-def _get_config_value(key_path: str, default_value: Any) -> Any:
-    """
-    Retrieves a configuration value, prioritizing environment variables.
-    Environment variable names are constructed as RESILIENCE_<CATEGORY>_<KEY>.
-    """
-    env_var_name = f"RESILIENCE_{key_path.replace('.', '_').upper()}"
-    env_val = os.getenv(env_var_name)
-
-    if env_val is not None:
-        # Attempt to convert to appropriate type based on default_value's type
-        if isinstance(default_value, bool):
-            return env_val.lower() == "true"
-        elif isinstance(default_value, int):
-            try:
-                return int(env_val)
-            except ValueError:
-                logger.warning(f"Invalid integer value for {env_var_name}: '{env_val}'. Using default: {default_value}")
-                return default_value
-        elif isinstance(default_value, float):
-            try:
-                return float(env_val)
-            except ValueError:
-                logger.warning(f"Invalid float value for {env_var_name}: '{env_val}'. Using default: {default_value}")
-                return default_value
-        return env_val # Return as string if type conversion fails or not applicable
-    return default_value
 
 class ConnectionHealthMonitor(threading.Thread):
     """
@@ -132,12 +98,12 @@ class ResourceManager(threading.Thread):
     """
     Monitors system CPU and memory usage and reports degraded or critical states.
     """
-    def __init__(self, config: dict, logger: logging.Logger):
+    def __init__(self, resilience_config: Any, logger: logging.Logger):
         super().__init__(daemon=True)
-        self.config = config
-        self.max_memory_percent = config["max_memory_percent"]
-        self.max_cpu_percent = config["max_cpu_percent"]
-        self.degraded_mode_threshold = config["degraded_mode_threshold"]
+        self.config = resilience_config # This is the config.resilience object
+        self.max_memory_percent = self.config.max_memory_percent
+        self.max_cpu_percent = self.config.max_cpu_percent
+        self.degraded_mode_threshold = self.config.degraded_mode_threshold
         self.logger = logger
         self.running = True
         self._current_memory_percent = 0.0
@@ -171,7 +137,7 @@ class ResourceManager(threading.Thread):
 
             except Exception as e:
                 self.logger.error(f"Error in ResourceManager: {e}")
-            time.sleep(self.config["interval_seconds"])
+            time.sleep(self.config.resource_monitoring_interval_seconds)
 
     def stop(self):
         self.running = False
@@ -442,8 +408,8 @@ class ResilienceManager:
         if self._initialized:
             return
         
-        self.config = self._load_config()
         self.logger = get_logger("ResilienceManager", "operational")
+        self.config = self._get_resilience_config()
 
         self.heartbeat_monitor: Optional[ConnectionHealthMonitor] = None
         self.resource_manager: Optional[ResourceManager] = None
@@ -455,21 +421,32 @@ class ResilienceManager:
         self._initialized = True
         self.start_monitors()
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Loads configuration from defaults and overrides with environment variables."""
-        config = {}
-        for category, defaults in DEFAULT_RESILIENCE_CONFIG.items():
-            config[category] = {}
-            for key, default_val in defaults.items():
-                full_key_path = f"{category}.{key}"
-                config[category][key] = _get_config_value(full_key_path, default_val)
-        return config
+    def _get_resilience_config(self) -> Any:
+        """
+        Loads the resilience configuration from the main application config.
+        Provides a fallback if the config cannot be loaded.
+        """
+        try:
+            app_config = get_config()
+            return app_config.resilience
+        except Exception as e:
+            self.logger.error(f"Failed to load application configuration for resilience: {e}. Using dummy/default values.")
+            # Create a dummy object that will return defaults via getattr
+            class FallbackResilienceConfig:
+                def __getattr__(self, name):
+                    self.logger.warning(f"Attempted to access missing resilience config attribute: {name}. Returning default (False/0).")
+                    if "enabled" in name or "enable" in name:
+                        return False
+                    if "interval_seconds" in name or "timeout_seconds" in name or "threshold" in name or "size" in name or "failures" in name or "sec" in name:
+                        return 0 # Sensible default for numeric values
+                    return None # Default for other types
+            return FallbackResilienceConfig()
 
     def start_monitors(self):
         """Initializes and starts all enabled resilience monitors."""
         self.logger.info("Starting resilience monitors...")
 
-        if self.config["heartbeat"]["enabled"]:
+        if self.config.heartbeat_enabled:
             # Placeholder for actual heartbeat function, needs to be passed from outside
             # For now, a dummy function. In a real system, this would check external service health.
             def dummy_heartbeat():
@@ -477,36 +454,36 @@ class ResilienceManager:
                 return True
             self.heartbeat_monitor = ConnectionHealthMonitor(
                 send_heartbeat=dummy_heartbeat,
-                interval=self.config["heartbeat"]["interval_seconds"],
-                timeout=self.config["heartbeat"]["timeout_seconds"],
+                interval=self.config.heartbeat_interval_seconds,
+                timeout=self.config.heartbeat_timeout_seconds,
                 logger=self.logger
             )
             self.heartbeat_monitor.start()
 
-        if self.config["resource_monitoring"]["enabled"]:
+        if self.config.resource_monitoring_enabled:
             self.resource_manager = ResourceManager(
-                config=self.config["resource_monitoring"],
+                resilience_config=self.config, # Pass the entire resilience config object
                 logger=self.logger
             )
             self.resource_manager.start()
 
-        if self.config["task_queue"]["enabled"]:
+        if self.config.task_queue_enabled:
             self.task_queue_manager = TaskQueueManager(
-                max_concurrent_tasks=self.config["task_queue"]["max_concurrent_tasks"],
+                max_concurrent_tasks=self.config.max_concurrent_tasks,
                 logger=self.logger,
-                queue_timeout=self.config["task_queue"]["queue_timeout_seconds"]
+                queue_timeout=self.config.queue_timeout_seconds
             )
             # Note: We don't start internal workers here as `code_with_multiple_ai` uses ThreadPoolExecutor
             # and directly interacts with enqueue_task/dequeue_task for concurrency control.
 
-        if self.config["circuit_breaker"]["enabled"]:
+        if self.config.enable_circuit_breaker:
             self.circuit_breaker = CircuitBreaker(
-                threshold=self.config["circuit_breaker"]["failure_threshold"],
-                reset_time=self.config["circuit_breaker"]["reset_time_seconds"],
+                threshold=self.config.circuit_breaker_max_failures,
+                reset_time=self.config.circuit_breaker_reset_time_sec,
                 logger=self.logger
             )
 
-        if self.config["auto_recovery"]["enabled"]:
+        if self.config.enable_auto_recovery:
             # Placeholder for actual reconnect function, needs to be passed from outside
             # For now, a dummy function. In a real system, this would attempt to re-establish a broken connection.
             def dummy_reconnect():
@@ -514,14 +491,14 @@ class ResilienceManager:
                 return True
             self.auto_recovery = AutoRecoverySystem(
                 reconnect_func=dummy_reconnect,
-                interval=self.config["auto_recovery"]["reconnect_interval_seconds"],
+                interval=self.config.auto_recovery_initial_delay_sec,
                 logger=self.logger
             )
             self.auto_recovery.start()
 
-        if self.config["performance_metrics"]["enabled"]:
+        if self.config.performance_metrics_enabled:
             self.performance_metrics = PerformanceMetrics(
-                window=self.config["performance_metrics"]["window_size"],
+                window=self.config.performance_window_size,
                 logger=self.logger
             )
             self.performance_metrics.start()

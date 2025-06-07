@@ -29,18 +29,53 @@ from app.adapters.aider_ai_code import code_with_aider
 # Import logging
 from app.core.logging import get_logger, log_structured
 
+# Import Config class
+from app.core.config import get_config
+
 # Configure logging
 logger = get_logger("ai_coding_tools", "operational")
 
-# Resilience configuration from environment variables with sensible defaults
-MAX_TASK_QUEUE_SIZE = int(os.getenv("MAX_TASK_QUEUE_SIZE", "10"))
-MAX_CONCURRENT_TASKS = int(os.getenv("MAX_CONCURRENT_TASKS", "5"))
-CIRCUIT_BREAKER_FAILURE_THRESHOLD = int(
-    os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "3")
-)
-CIRCUIT_BREAKER_RESET_TIMEOUT = int(
-    os.getenv("CIRCUIT_BREAKER_RESET_TIMEOUT", "60")
-)  # seconds
+# Helper to load and cache configuration
+_cached_config = None
+def _get_cached_config():
+    global _cached_config
+    if _cached_config is None:
+        try:
+            _cached_config = get_config()
+        except Exception as e:
+            logger.error(f"Failed to load configuration: {e}. Using default values.")
+            # Create a dummy config object with defaults if loading fails
+            class DummyConfig:
+                class System:
+                    task_queue_max_size = 10
+                    default_conflict_handling = "auto"
+                class Features:
+                    max_parallel_workers = 5
+                    enable_cost_tracking = True
+                    enable_cost_logging = False
+                    enable_target_resolution = True
+                    enable_context_extraction = False
+                    enable_conflict_detection = True
+                class Resilience:
+                    circuit_breaker_max_failures = 3
+                    circuit_breaker_reset_time_sec = 60
+                class Context:
+                    default_max_tokens = 4000
+                system = System()
+                features = Features()
+                resilience = Resilience()
+                context = Context()
+            _cached_config = DummyConfig()
+    return _cached_config
+
+# Load configuration
+config = _get_cached_config()
+
+# Resilience configuration from Config with sensible defaults
+MAX_TASK_QUEUE_SIZE = getattr(config.system, 'task_queue_max_size', 10)
+MAX_CONCURRENT_TASKS = getattr(config.features, 'max_parallel_workers', 5)
+CIRCUIT_BREAKER_FAILURE_THRESHOLD = getattr(config.resilience, 'circuit_breaker_max_failures', 3)
+CIRCUIT_BREAKER_RESET_TIMEOUT = getattr(config.resilience, 'circuit_breaker_reset_time_sec', 60)  # seconds
 
 # Task queue for managing incoming tasks
 task_queue = Queue(maxsize=MAX_TASK_QUEUE_SIZE)
@@ -276,6 +311,10 @@ def code_with_ai(
         JSON string with results including success status and diff output
     """
     try:
+        # Load config inside the function to ensure it's always fresh if needed,
+        # though _get_cached_config handles caching.
+        current_config = _get_cached_config()
+
         # Set default empty list for readonly files if not provided
         if readonly_files is None:
             readonly_files = []
@@ -285,7 +324,7 @@ def code_with_ai(
             model = get_optimal_model(prompt)
 
         # Phase 2: Cost Pre-flight Check
-        if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true":
+        if getattr(current_config.features, 'enable_cost_tracking', True):
             try:
                 # Read file contents for cost estimation
                 files_content = []
@@ -321,7 +360,7 @@ def code_with_ai(
                     return json.dumps(error_response)
                 
                 # Log cost estimate only if logging enabled
-                if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
+                if getattr(current_config.features, 'enable_cost_logging', False):
                     if budget_message:  # Warning message
                         logger.warning(f"Cost warning: {budget_message}")
                     
@@ -329,7 +368,7 @@ def code_with_ai(
                                f"({cost_estimate.input_tokens}+{cost_estimate.estimated_output_tokens} tokens, {model})")
                 
             except Exception as e:
-                if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
+                if getattr(current_config.features, 'enable_cost_logging', False):
                     logger.warning(f"Cost estimation failed: {e}")
                 # Continue without cost tracking if estimation fails
 
@@ -353,7 +392,7 @@ def code_with_ai(
         
         # Phase 2.6: Target Resolution (expand decorator targets to actual function names)
         original_targets = target_elements.copy() if target_elements else None
-        if target_elements and os.getenv("ENABLE_TARGET_RESOLUTION", "true").lower() == "true":
+        if target_elements and getattr(current_config.features, 'enable_target_resolution', True):
             try:
                 resolved_targets = resolve_target_elements(
                     target_elements=target_elements,
@@ -374,13 +413,13 @@ def code_with_ai(
         context_extraction_used = False
         
         if (target_elements and 
-            os.getenv("ENABLE_CONTEXT_EXTRACTION", "false").lower() == "true"):
+            getattr(current_config.features, 'enable_context_extraction', False)):
             try:
                 context_extraction_used = True
                 logger.info("Context extraction enabled, processing files...")
                 
                 # Get configuration
-                max_tokens = int(os.getenv("CONTEXT_DEFAULT_MAX_TOKENS", "4000"))
+                max_tokens = getattr(current_config.context, 'default_max_tokens', 4000)
                 
                 # NEW: Smart target-to-file mapping instead of round-robin
                 context_sections = []
@@ -400,7 +439,7 @@ def code_with_ai(
                                 context_result = extract_context(
                                     file_path=full_path,
                                     target_element=primary_target,
-                                    max_tokens=max_tokens // len(editable_files)
+                                    max_tokens=max_tokens // len(editable_files) if len(editable_files) > 0 else max_tokens
                                 )
                                 
                                 if context_result:
@@ -456,7 +495,7 @@ def code_with_ai(
         )
         
         # Phase 2: Record actual cost (if cost tracking enabled)
-        if os.getenv("ENABLE_COST_TRACKING", "true").lower() == "true":
+        if getattr(current_config.features, 'enable_cost_tracking', True):
             try:
                 duration = time.time() - start_time
                 
@@ -492,7 +531,7 @@ def code_with_ai(
                     pass
                     
             except Exception as e:
-                if os.getenv("ENABLE_COST_LOGGING", "false").lower() == "true":
+                if getattr(current_config.features, 'enable_cost_logging', False):
                     logger.warning(f"Cost recording failed: {e}")
         
         # Add auto-detection metadata to result
@@ -539,7 +578,7 @@ def code_with_multiple_ai(
     max_workers: Optional[int] = None,
     parallel: bool = True,
     target_elements_list: Optional[List[List[str]]] = None,  # NEW: Context extraction targets
-    conflict_handling: str = os.getenv("DEFAULT_CONFLICT_HANDLING", "auto"),  # NEW: Conflict detection handling from env
+    conflict_handling: str = None, # Default to None, will be set by config
 ) -> str:
     """
     Use Multiple Aider agents with strategic model selection to perform AI coding tasks.
@@ -612,6 +651,14 @@ def code_with_multiple_ai(
         JSON string with aggregated results including success status and diff outputs
     """
 
+    # Load config inside the function to ensure it's always fresh if needed,
+    # though _get_cached_config handles caching.
+    current_config = _get_cached_config()
+
+    # Resolve conflict_handling from config if not explicitly provided
+    if conflict_handling is None:
+        conflict_handling = getattr(current_config.system, 'default_conflict_handling', "auto")
+
     def enqueue_task(task):
         try:
             task_queue.put(task, block=False)
@@ -627,21 +674,18 @@ def code_with_multiple_ai(
         except Empty:
             return None
 
-    # Validate and normalize conflict_handling from environment variable or parameter
+    # Validate and normalize conflict_handling
     valid_conflict_values = {"auto", "warn", "ignore"}
     if conflict_handling not in valid_conflict_values:
-        logger.warning(f"Invalid DEFAULT_CONFLICT_HANDLING value '{conflict_handling}' detected. Falling back to 'auto'.")
+        logger.warning(f"Invalid conflict_handling value '{conflict_handling}' detected. Falling back to 'auto'.")
         conflict_handling = "auto"
     else:
-        logger.info(f"Using conflict_handling mode: '{conflict_handling}' from environment or parameter.")
+        logger.info(f"Using conflict_handling mode: '{conflict_handling}' from config or parameter.")
 
-    # Respect ENABLE_CONFLICT_DETECTION environment variable
-    enable_conflict_detection = os.getenv("ENABLE_CONFLICT_DETECTION", "true").lower()
-    if enable_conflict_detection not in {"true", "false"}:
-        logger.warning(f"Invalid ENABLE_CONFLICT_DETECTION value '{enable_conflict_detection}' detected. Assuming 'true'.")
-        enable_conflict_detection = "true"
-    if enable_conflict_detection == "false":
-        logger.info("Conflict detection disabled by ENABLE_CONFLICT_DETECTION environment variable. Forcing conflict_handling to 'ignore'.")
+    # Respect ENABLE_CONFLICT_DETECTION config value
+    enable_conflict_detection = getattr(current_config.features, 'enable_conflict_detection', True)
+    if not enable_conflict_detection:
+        logger.info("Conflict detection disabled by configuration. Forcing conflict_handling to 'ignore'.")
         conflict_handling = "ignore"
 
     try:
@@ -1033,3 +1077,4 @@ def code_with_multiple_ai(
             "details": "The server encountered a critical error but remained running.",
         }
         return json.dumps(error_response, indent=4)
+

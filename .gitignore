@@ -33,6 +33,7 @@ logs/
 
 # 🗃️ Backup Files
 readme-backups/
+migration_backup_20250607/
 cleanup_backup_20250607/
 backup_20250606_185053/
 backup/

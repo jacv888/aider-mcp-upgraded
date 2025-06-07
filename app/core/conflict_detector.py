@@ -8,11 +8,23 @@ from collections import defaultdict
 # Assuming get_logger is available from app.core.logging
 try:
     from app.core.logging import get_logger
+    from app.core.config import get_config
 except ImportError:
-    # Fallback for standalone testing or if logging module is not yet integrated
+    # Fallback for standalone testing or if logging/config modules are not yet integrated
     logging.basicConfig(level=logging.INFO)
     def get_logger(name, log_category="operational"):
         return logging.getLogger(name)
+    # Dummy Config class for standalone testing
+    class DummyFeaturesConfig:
+        enable_conflict_detection = True
+        conflict_detection_timeout = 5
+        enable_conflict_logging = True
+        conflict_report_verbosity = "standard"
+    class DummyConfig:
+        features = DummyFeaturesConfig()
+    def get_config():
+        return DummyConfig()
+
 
 logger = get_logger(__name__, "operational")
 
@@ -24,11 +36,11 @@ class FileConflictDetector:
     - Normalize file paths (handling relative/absolute paths and symlinks).
     - Identify which tasks have common editable files.
     - Generate clear reports detailing detected conflicts.
-    - Configure behavior via environment variables:
-      - ENABLE_CONFLICT_DETECTION (bool): Enable or disable conflict detection (default: True).
-      - CONFLICT_DETECTION_TIMEOUT (int): Timeout in seconds for conflict detection (default: 5).
-      - ENABLE_CONFLICT_LOGGING (bool): Enable or disable logging of conflicts (default: True).
-      - CONFLICT_REPORT_VERBOSITY (str): Verbosity level for conflict reports: minimal, standard, verbose (default: standard).
+    - Configure behavior via the application's Config class (specifically, config.features):
+      - enable_conflict_detection (bool): Enable or disable conflict detection (default: True).
+      - conflict_detection_timeout (int): Timeout in seconds for conflict detection (default: 5).
+      - enable_conflict_logging (bool): Enable or disable logging of conflicts (default: True).
+      - conflict_report_verbosity (str): Verbosity level for conflict reports: minimal, standard, verbose (default: standard).
 
     It is designed to be robust, handling edge cases like empty lists or invalid paths,
     and includes proper logging and error handling for production readiness.
@@ -44,58 +56,37 @@ class FileConflictDetector:
                                          working directory will be used.
         """
         self.working_dir = Path(working_dir).resolve() if working_dir else Path.cwd().resolve()
-        self.enable_conflict_detection = self._get_env_bool("ENABLE_CONFLICT_DETECTION", True)
-        self.conflict_detection_timeout = self._get_env_int("CONFLICT_DETECTION_TIMEOUT", 5)
-        self.enable_conflict_logging = self._get_env_bool("ENABLE_CONFLICT_LOGGING", True)
-        self.conflict_report_verbosity = os.getenv("CONFLICT_REPORT_VERBOSITY", "standard").lower()
+
+        try:
+            self.config = get_config()
+            features_config = self.config.features
+        except Exception as e:
+            logger.error(f"Failed to load configuration for conflict detector, using defaults: {e}")
+            # Fallback to a dummy object that will return defaults via getattr
+            class FallbackFeaturesConfig:
+                pass
+            features_config = FallbackFeaturesConfig()
+
+        self.enable_conflict_detection = getattr(features_config, "enable_conflict_detection", True)
+        self.conflict_detection_timeout = getattr(features_config, "conflict_detection_timeout", 5)
+        self.enable_conflict_logging = getattr(features_config, "enable_conflict_logging", True)
+        
+        # For verbosity, ensure it's a string and lowercased, then validate
+        verbosity_from_config = getattr(features_config, "conflict_report_verbosity", "standard")
+        self.conflict_report_verbosity = str(verbosity_from_config).lower()
         if self.conflict_report_verbosity not in {"minimal", "standard", "verbose"}:
             self.conflict_report_verbosity = "standard"
 
         if self.enable_conflict_logging:
             logger.info(f"FileConflictDetector initialized with working directory: {self.working_dir}")
-            logger.info(f"Conflict detection enabled: {self.enable_conflict_detection}")
-            logger.info(f"Conflict detection timeout: {self.conflict_detection_timeout} seconds")
-            logger.info(f"Conflict logging enabled: {self.enable_conflict_logging}")
-            logger.info(f"Conflict report verbosity: {self.conflict_report_verbosity}")
-
-    def _get_env_bool(self, var_name: str, default: bool) -> bool:
-        """
-        Helper to read a boolean environment variable with fallback.
-
-        Args:
-            var_name (str): Environment variable name.
-            default (bool): Default value if not set or invalid.
-
-        Returns:
-            bool: Parsed boolean value.
-        """
-        val = os.getenv(var_name)
-        if val is None:
-            return default
-        return val.strip().lower() in {"1", "true", "yes", "on"}
-
-    def _get_env_int(self, var_name: str, default: int) -> int:
-        """
-        Helper to read an integer environment variable with fallback.
-
-        Args:
-            var_name (str): Environment variable name.
-            default (int): Default value if not set or invalid.
-
-        Returns:
-            int: Parsed integer value.
-        """
-        val = os.getenv(var_name)
-        if val is None:
-            return default
-        try:
-            return int(val)
-        except ValueError:
-            return default
+            logger.info(f"Conflict detection enabled (from config): {self.enable_conflict_detection}")
+            logger.info(f"Conflict detection timeout (from config): {self.conflict_detection_timeout} seconds")
+            logger.info(f"Conflict logging enabled (from config): {self.enable_conflict_logging}")
+            logger.info(f"Conflict report verbosity (from config): {self.conflict_report_verbosity}")
 
     def is_conflict_detection_enabled(self) -> bool:
         """
-        Checks if conflict detection is enabled via environment variable.
+        Checks if conflict detection is enabled via configuration.
 
         Returns:
             bool: True if enabled, False otherwise.
@@ -162,8 +153,8 @@ class FileConflictDetector:
 
         A conflict occurs if two or more tasks declare the same file as editable.
 
-        This method respects the ENABLE_CONFLICT_DETECTION environment variable.
-        It also enforces a timeout (in seconds) specified by CONFLICT_DETECTION_TIMEOUT.
+        This method respects the `enable_conflict_detection` setting from the Config.
+        It also enforces a timeout (in seconds) specified by `conflict_detection_timeout`.
 
         Args:
             tasks_data (List[Dict[str, Union[str, List[str]]]]): A list of dictionaries,
@@ -184,7 +175,7 @@ class FileConflictDetector:
         """
         if not self.enable_conflict_detection:
             if self.enable_conflict_logging:
-                logger.info("Conflict detection is disabled via environment variable.")
+                logger.info("Conflict detection is disabled via configuration.")
             return {
                 "has_conflicts": False,
                 "conflicting_files": {},
@@ -288,7 +279,7 @@ class FileConflictDetector:
 
         Args:
             conflicts_data (Dict[str, Any]): The output dictionary from `detect_conflicts`.
-            verbosity (Optional[str]): Verbosity level to override environment variable.
+            verbosity (Optional[str]): Verbosity level to override configuration setting.
                                        One of 'minimal', 'standard', 'verbose'.
 
         Returns:
@@ -345,10 +336,21 @@ class FileConflictDetector:
 
         if verbosity == "verbose":
             report_lines.append("\nVerbose Details:")
-            for task_id, files in conflicts_data.get("task_file_map", {}).items():
-                report_lines.append(f"Task '{task_id}' edits files:")
-                for f in sorted(files):
-                    report_lines.append(f"  - {f}")
+            # Note: task_file_map is not directly stored in conflicts_data output from detect_conflicts
+            # If this detail is needed, detect_conflicts would need to return it.
+            # For now, this section will likely be empty unless conflicts_data is augmented elsewhere.
+            # Keeping it for consistency with original verbose intent.
+            all_tasks_data = conflicts_data.get("all_tasks_data", []) # Placeholder if full task data is passed
+            if all_tasks_data:
+                report_lines.append("\nAll Task File Mappings:")
+                for task_item in all_tasks_data:
+                    task_id = task_item.get("task_id")
+                    editable_files = task_item.get("editable_files")
+                    if task_id and editable_files:
+                        report_lines.append(f"Task '{task_id}' edits files:")
+                        for f in sorted(editable_files):
+                            report_lines.append(f"  - {f}")
+
 
         if self.enable_conflict_logging:
             logger.warning("Generated conflict report: Conflicts detected.")
@@ -453,9 +455,17 @@ if __name__ == "__main__":
     import json
     print(json.dumps(conflicts, indent=2))
 
-    print("\n--- Conflict Report ---")
+    print("\n--- Conflict Report (Standard Verbosity) ---")
     report = detector.generate_conflict_report(conflicts)
     print(report)
+
+    print("\n--- Conflict Report (Verbose Verbosity) ---")
+    # To make verbose report show task_file_map, we need to pass original tasks_to_check
+    # This is a slight deviation from original, but makes verbose output meaningful.
+    conflicts_verbose = conflicts.copy()
+    conflicts_verbose["all_tasks_data"] = tasks_to_check 
+    report_verbose = detector.generate_conflict_report(conflicts_verbose, verbosity="verbose")
+    print(report_verbose)
 
     print("\n--- Helper Function Tests ---")
     conflicting_files_set = detector.get_conflicting_files(conflicts)

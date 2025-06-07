@@ -12,7 +12,7 @@ try:
 except ImportError:
     load_dotenv = None
 from pathlib import Path
-
+from app.core.config import Config # Added this import
 
 class ModelRegistry:
     """
@@ -40,6 +40,8 @@ class ModelRegistry:
         self._config_cache = {}
         self._last_reload_time = 0
         self._config_file_paths = []
+        self._default_model = "gpt-4o" # Initialize with a sensible default
+        self._override_model = None    # Initialize override model
         self._load_configuration()
         self._initialized = True
     
@@ -69,46 +71,52 @@ class ModelRegistry:
         self._load_model_mappings()
     
     def _load_model_mappings(self):
-        """Load all model mappings from environment variables."""
+        """Load all model mappings from Config class."""
+        config = Config()
+        assignments = config.models.assignments
+        
+        # Store default model first, as it's used for fallbacks
+        self._default_model = getattr(assignments, "default", "gpt-4o")
+        
         self._config_cache = {
             # Complexity-based models
-            "hard": os.getenv("AIDER_MODEL_HARD", "gpt-4.1-2025-04-14"),
-            "complex": os.getenv("AIDER_MODEL_COMPLEX", "gemini/gemini-2.5-pro-preview-05-06"),
-            "medium": os.getenv("AIDER_MODEL_MEDIUM", "gemini/gemini-2.5-flash-preview-05-20"),
-            "easy": os.getenv("AIDER_MODEL_EASY", "gpt-4.1-mini-2025-04-14"),
-            "simple": os.getenv("AIDER_MODEL_SIMPLE", "gpt-4.1-nano-2025-04-14"),
+            "hard": getattr(assignments, "complexity_hard", self._default_model),
+            "complex": getattr(assignments, "complexity_complex", self._default_model),
+            "medium": getattr(assignments, "complexity_medium", self._default_model),
+            "easy": getattr(assignments, "complexity_easy", self._default_model),
+            "simple": getattr(assignments, "complexity_simple", self._default_model),
             
             # Task-type based models
-            "writing": os.getenv("AIDER_MODEL_WRITING", "anthropic/claude-sonnet-4-20250514"),
-            "documentation": os.getenv("AIDER_MODEL_DOCS", "gemini/gemini-2.5-flash-preview-05-20"),
-            "testing": os.getenv("AIDER_MODEL_TESTING", "gpt-4.1-mini-2025-04-14"),
-            "refactor": os.getenv("AIDER_MODEL_REFACTOR", "anthropic/claude-sonnet-4-20250514"),
-            "optimization": os.getenv("AIDER_MODEL_OPTIMIZATION", "gpt-4.1-2025-04-14"),
-            "algorithm": os.getenv("AIDER_MODEL_ALGORITHM", "gemini/gemini-2.5-pro-preview-05-06"),
+            "writing": getattr(assignments, "task_writing", self._default_model),
+            "documentation": getattr(assignments, "task_docs", self._default_model),
+            "testing": getattr(assignments, "task_testing", self._default_model),
+            "refactor": getattr(assignments, "task_refactor", self._default_model),
+            "optimization": getattr(assignments, "task_optimization", self._default_model), # Added missing task mapping
+            "algorithm": getattr(assignments, "task_algorithm", self._default_model),     # Added missing task mapping
             
-            # Technology-specific models
-            "react": os.getenv("AIDER_MODEL_REACT", "gpt-4.1-mini-2025-04-14"),
-            "vue": os.getenv("AIDER_MODEL_VUE", "gpt-4.1-mini-2025-04-14"),
-            "python": os.getenv("AIDER_MODEL_PYTHON", "gpt-4.1-mini-2025-04-14"),
-            "javascript": os.getenv("AIDER_MODEL_JAVASCRIPT", "gemini/gemini-2.5-flash-preview-05-20"),
-            "typescript": os.getenv("AIDER_MODEL_TYPESCRIPT", "gpt-4.1-mini-2025-04-14"),
-            "css": os.getenv("AIDER_MODEL_CSS", "gemini/gemini-2.5-flash-preview-05-20"),
-            "database": os.getenv("AIDER_MODEL_DATABASE", "gpt-4.1-mini-2025-04-14"),
-            "api": os.getenv("AIDER_MODEL_API", "gemini/gemini-2.5-flash-preview-05-20"),
-            "frontend": os.getenv("AIDER_MODEL_FRONTEND", "gemini/gemini-2.5-flash-preview-05-20"),
-            "backend": os.getenv("AIDER_MODEL_BACKEND", "gpt-4.1-mini-2025-04-14"),
+            # Technology-specific models (corrected names and added fallbacks)
+            "react": getattr(assignments, "technology_react", self._default_model),
+            "vue": getattr(assignments, "technology_vue", self._default_model),
+            "python": getattr(assignments, "technology_python", self._default_model),
+            "javascript": getattr(assignments, "technology_javascript", self._default_model),
+            "typescript": getattr(assignments, "technology_typescript", self._default_model),
+            "css": getattr(assignments, "technology_html_css", self._default_model), # Corrected to html_css
+            "database": getattr(assignments, "technology_database", self._default_model),
+            "api": getattr(assignments, "technology_api", self._default_model),
+            "frontend": getattr(assignments, "technology_frontend", self._default_model),
+            "backend": getattr(assignments, "technology_backend", self._default_model),
             
             # Performance-based models
-            "fast": os.getenv("AIDER_MODEL_FAST", "gemini/gemini-2.5-flash-preview-05-20"),
-            "quick": os.getenv("AIDER_MODEL_QUICK", "gpt-4.1-nano-2025-04-14"),
-            "debug": os.getenv("AIDER_MODEL_DEBUG", "gpt-4.1-mini-2025-04-14"),
+            "fast": getattr(assignments, "performance_fast", self._default_model),
+            "quick": getattr(assignments, "performance_quick", self._default_model),
+            "debug": getattr(assignments, "performance_debug", self._default_model),
         }
         
-        # Store default model
-        self._default_model = os.getenv("AIDER_MODEL", "gpt-4.1-mini-2025-04-14")
-        
-        # Store override model if specified
-        self._override_model = os.getenv("AIDER_MODEL") if os.getenv("AIDER_MODEL") else None
+        # Store override model if specified.
+        # Removed non-existent 'default_override' attribute.
+        # If there's another attribute for global override, it should be used here.
+        # Otherwise, it remains None as initialized.
+        self._override_model = None # Explicitly set to None as default_override is non-existent
 
     def resolve_model(self, task_type: str, explicit_model: Optional[str] = None) -> str:
         """
