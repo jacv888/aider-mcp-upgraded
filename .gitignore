@@ -6,6 +6,7 @@ docs/
 logs/
 reference/
 tests/
+test/
 prompts/
 upgrades/
 
