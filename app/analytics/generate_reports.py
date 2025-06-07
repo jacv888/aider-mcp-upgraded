@@ -23,14 +23,23 @@ from datetime import datetime
 from pathlib import Path
 from .metrics_extractor import LogMetricsExtractor
 
+# Helper to get the current month's operational log file path
+def _get_current_operational_log_path():
+    current_month = datetime.now().strftime("%Y-%m")
+    return f"logs/current/operational_{current_month}.json"
+
 class ReportGenerator:
     """Generate automated analytics reports"""
     
-    def __init__(self, log_file: str = "logs/operational.json", output_dir: str = "logs/reports"):
-        self.log_file = log_file
+    def __init__(self, log_file: str = None, output_dir: str = "logs/reports"):
+        # If log_file is not provided, use the current month's log file
+        if log_file is None:
+            self.log_file = _get_current_operational_log_path()
+        else:
+            self.log_file = log_file
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
-        self.extractor = LogMetricsExtractor(log_file)
+        self.extractor = LogMetricsExtractor(self.log_file)
     
     def generate_all_reports(self, export_format: str = "json"):
         """Generate comprehensive analytics reports"""
@@ -283,7 +292,7 @@ def main():
     parser.add_argument("--watch", action="store_true", help="Continuous monitoring mode")
     parser.add_argument("--interval", type=int, default=300, help="Update interval in seconds (watch mode)")
     parser.add_argument("--export", choices=["json", "html"], default="json", help="Export format")
-    parser.add_argument("--log-file", default="logs/operational.json", help="JSON log file path")
+    parser.add_argument("--log-file", default=_get_current_operational_log_path(), help="JSON log file path")
     parser.add_argument("--output-dir", default="logs/reports", help="Output directory for reports")
     
     args = parser.parse_args()

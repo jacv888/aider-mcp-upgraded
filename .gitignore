@@ -9,6 +9,7 @@ tests/
 test/
 prompts/
 upgrades/
+snippets/
 
 # 🔐 Security - API Keys and Sensitive Data
 .env
@@ -33,6 +34,7 @@ logs/
 
 # 🗃️ Backup Files
 readme-backups/
+costs_DEPRECATED_20250607/
 migration_backup_20250607/
 cleanup_backup_20250607/
 backup_20250606_185053/

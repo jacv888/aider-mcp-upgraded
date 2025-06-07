@@ -196,6 +196,9 @@ def get_logger(name, log_category="operational"):
     # Create log directory if it doesn't exist
     if cfg.get("enable_file_logging", True) or cfg.get("enable_json_logging", True):
         log_path = Path(cfg.get("log_directory", "logs"))
+        # Ensure logs/current/, logs/archive/ directories exist
+        for subdir in ["current", "archive"]:
+            (log_path / subdir).mkdir(parents=True, exist_ok=True)
         log_path.mkdir(exist_ok=True)
 
     # Standard file handler (if enabled)

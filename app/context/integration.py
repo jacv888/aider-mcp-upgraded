@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .context_manager import ContextManager, ExtractionConfig, extract_context
 from .types import ContextBlock
+from .auto_detection_tracker import track_auto_detection
 
 
 class ContextAwareFileManager:
@@ -71,6 +72,16 @@ class ContextAwareFileManager:
             file_path, target_element, config
         )
         
+        # Track auto-detection metrics
+        stats = result['extraction_stats']
+        if stats.get('original_tokens', 0) > 0 and result.get('target_elements'):
+            track_auto_detection(
+                original_prompt_length=stats.get('original_tokens', 0),
+                target_elements_found=len(result['target_elements']),
+                optimized_prompt_length=stats.get('focused_tokens', 0),
+                session_context="single_file_context"
+            )
+        
         return {
             'content': result['focused_context'],
             'stats': result['extraction_stats'],
@@ -127,6 +138,16 @@ class ContextAwareFileManager:
                 targets = context_result['metadata']['target_elements']
                 combined_context_parts.append(f"# Focused on: {', '.join(targets)}")
                 combined_context_parts.append(f"# Token reduction: {context_result['stats']['reduction_ratio']:.2%}")
+                
+                # Track auto-detection metrics for real measurement
+                stats = context_result['stats']
+                if stats.get('original_tokens', 0) > 0 and len(targets) > 0:
+                    track_auto_detection(
+                        original_prompt_length=stats.get('original_tokens', 0),
+                        target_elements_found=len(targets),
+                        optimized_prompt_length=stats.get('focused_tokens', 0),
+                        session_context="multi_file_context"
+                    )
             
             combined_context_parts.append(context_result['content'])
             combined_context_parts.append("")  # Separator

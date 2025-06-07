@@ -19,6 +19,10 @@ fi
 PROJECT_ROOT=$(pwd)
 echo "📁 Project Root: $PROJECT_ROOT"
 
+# Create necessary directory structure
+echo "📂 Creating directory structure..."
+python3 app/scripts/setup_directories.py
+
 # Check if .env exists
 if [[ ! -f ".env" ]]; then
     if [[ -f ".env.example" ]]; then

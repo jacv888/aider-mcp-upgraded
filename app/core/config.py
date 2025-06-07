@@ -154,15 +154,15 @@ class ResilienceConfig:
 @dataclass
 class LoggingConfig:
     log_level: str = field(default_factory=lambda: _env_str("LOG_LEVEL", "INFO").upper())
-    log_file_path: str = field(default_factory=lambda: _env_str("LOG_FILE_PATH", "logs/app_log.json"))
+    log_file_path: str = field(default_factory=lambda: _env_str("LOG_FILE_PATH", "logs/current/app_log.json"))
     log_format: str = field(default_factory=lambda: _env_str("LOG_FORMAT", "json")) # "json" or "text"
     log_rotation_policy: str = field(default_factory=lambda: _env_str("LOG_ROTATION_POLICY", "monthly")) # "daily", "weekly", "monthly", "size"
     log_rotation_max_size_mb: int = field(default_factory=lambda: _env_int("LOG_ROTATION_MAX_SIZE_MB", 100))
     log_rotation_backup_count: int = field(default_factory=lambda: _env_int("LOG_ROTATION_BACKUP_COUNT", 5))
     enable_console_logging: bool = field(default_factory=lambda: _env_bool("ENABLE_CONSOLE_LOGGING", True))
-    enable_file_logging: bool = field(default_factory=lambda: _env_bool("ENABLE_FILE_LOGGING", True)) # To explicitly enable/disable file logging
+    enable_file_logging: bool = field(default_factory=lambda: _env_bool("ENABLE_FILE_LOGGING", False)) # To explicitly enable/disable file logging
     enable_auto_detection_logging: bool = field(default_factory=lambda: _env_bool("ENABLE_AUTO_DETECTION_LOGGING", True))
-    auto_detection_log_file_path: str = field(default_factory=lambda: _env_str("AUTO_DETECTION_LOG_FILE_PATH", "logs/auto_detection.json"))
+    auto_detection_log_file_path: str = field(default_factory=lambda: _env_str("AUTO_DETECTION_LOG_FILE_PATH", "logs/current/auto_detection_2025-06.json"))
     log_categories: List[str] = field(default_factory=lambda: _env_list_str("LOG_CATEGORIES", ["operational", "security", "cost", "debug"]))
 
 @dataclass

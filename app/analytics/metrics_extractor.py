@@ -26,7 +26,7 @@ from pathlib import Path
 class LogMetricsExtractor:
     """Extract metrics from JSON structured logs"""
     
-    def __init__(self, log_file_path: str = "logs/operational.json"):
+    def __init__(self, log_file_path: str = "logs/current/operational_2025-06.json"):
         self.log_file_path = Path(log_file_path)
         self.logs = []
         self.load_logs()
@@ -137,7 +137,7 @@ def main():
     parser.add_argument("--report", choices=["performance", "operational", "summary"],
                        default="summary", help="Type of report to generate")
     parser.add_argument("--hours", type=int, default=24, help="Time range in hours")
-    parser.add_argument("--log-file", default="logs/operational.json", help="JSON log file path")
+    parser.add_argument("--log-file", default="logs/current/operational_2025-06.json", help="JSON log file path")
     parser.add_argument("--output", choices=["json", "pretty"], default="pretty", help="Output format")
     
     args = parser.parse_args()

@@ -146,14 +146,19 @@ aider-mcp/
 │   │   └── aider_mcp.py   # MCP server entry point
 │   ├── tools/             # Modular MCP tools
 │   │   ├── ai_coding_tools.py      # Core AI functions
-│   │   ├── cost_management_tools.py # Cost tracking
 │   │   ├── health_monitoring_tools.py # Health checks
 │   │   └── planning_tools.py       # Task planning
 │   ├── context/           # Auto-detection & context extraction
 │   ├── models/            # Strategic model selection
-│   ├── cost/              # Cost management infrastructure
 │   ├── adapters/          # Aider integration
+│   ├── scripts/           # Setup and utility scripts
 │   └── analytics/         # Performance monitoring
+├── logs/
+│   ├── current/           # Active monthly logs
+│   └── archive/           # Legacy logs
+├── ai-logs/
+│   ├── active/            # Current session logs
+│   └── archive/           # Archived session logs  
 ├── main.py                # Entry point
 ├── requirements.txt       # Dependencies
 └── .env.example          # Configuration template
@@ -295,8 +300,8 @@ get_system_health()  # Real-time health status
 ```
 
 ### Data Location
-- **Costs**: `/costs/costs_2025-06.json` (monthly files)
-- **Logs**: `/logs/operational_2025-06.json` (structured data)
+- **Logs**: `/logs/current/operational_2025-06.json` (active monthly logs)
+- **Archive**: `/logs/archive/` (legacy logs) 
 - **Reports**: On-demand CSV/JSON exports
 
 ## 🤝 Contributing

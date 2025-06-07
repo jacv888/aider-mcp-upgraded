@@ -19,7 +19,7 @@ def get_system_health() -> str:
         # Helper function to get log file path
         def get_log_file_path(base_name: str) -> str:
             current_month = datetime.utcnow().strftime("%Y-%m")
-            return f"logs/{base_name}_{current_month}.json"
+            return f"logs/current/{base_name}_{current_month}.json"
         
         # Helper function to load and analyze logs
         def analyze_recent_logs(log_file: str, hours: int = 24) -> dict:
