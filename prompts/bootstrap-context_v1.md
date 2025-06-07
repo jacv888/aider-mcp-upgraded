@@ -1,7 +1,7 @@
 # 🚨 Bootstrap & Context Management Module
 
 *Load this once at session start, then focus on core coding workflow*
-{MCP_SERVER_ROOT}=/Users/user/mcps/aider-mcp/
+{MCP_SERVER_ROOT}=/Users/user/mcps/aider-mcp-upgraded/
 
 ## 🔄 PRIORITY: Session Initialization
 

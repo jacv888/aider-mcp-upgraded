@@ -202,7 +202,7 @@ python app/scripts/update_claude_config.py
 ```bash
 # Copy these files to Claude Desktop Project Instructions:
 # prompts/context-management-engine_v4.md → Session automation & context
-{MCP_SERVER_ROOT}=/Users/user/mcps/aider-mcp/
+{MCP_SERVER_ROOT}=/Users/user/mcps/aider-mcp-upgraded/
 # prompts/project-system-instructions_v8.md → Multi-agent workflow optimization
 {WORKSPACE_DIR=}=/Users/user/projects/my-project/
 ```
