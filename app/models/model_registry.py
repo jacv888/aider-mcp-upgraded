@@ -6,7 +6,7 @@ Provides a single source of truth for model mappings and configuration.
 import os
 import json
 import threading
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set
 try:
     from dotenv import load_dotenv
 except ImportError:
@@ -43,7 +43,7 @@ class ModelRegistry:
         self._load_configuration()
         self._initialized = True
     
-    def _get_config_paths(self) -> list[str]:
+    def _get_config_paths(self) -> List[str]:
         """Get configuration file paths in priority order (highest to lowest)."""
         project_root = Path(__file__).parent
         return [
