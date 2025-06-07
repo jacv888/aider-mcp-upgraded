@@ -8,16 +8,32 @@ Integrates with existing ai-logs directory structure for consistency.
 import os
 import sys
 import shutil
+import argparse # Import argparse
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any
-from typing import Dict, Any
+from dotenv import load_dotenv # Import load_dotenv
+
+def _get_workspace_dir() -> Path:
+    """
+    Loads the workspace directory from the MCP_SERVER_ROOT environment variable.
+    Falls back to the current working directory if not found.
+    """
+    load_dotenv() # Load environment variables from .env file
+    workspace_root = os.getenv("MCP_SERVER_ROOT")
+    if workspace_root:
+        print(f"Using workspace from MCP_SERVER_ROOT: {workspace_root}")
+        return Path(workspace_root)
+    else:
+        current_dir = Path.cwd()
+        print(f"MCP_SERVER_ROOT not set, using current working directory: {current_dir}")
+        return current_dir
 
 class AiderHistoryManager:
     """Manages Aider chat history backups and rotation."""
     
-    def __init__(self, workspace_dir: str = "/Users/jacquesv/MCP/aider-mcp"):
-        self.workspace_dir = Path(workspace_dir)
+    def __init__(self, workspace_dir: Path = None):
+        self.workspace_dir = workspace_dir if workspace_dir is not None else _get_workspace_dir()
         self.aider_history_file = self.workspace_dir / ".aider.chat.history.md"
         self.backup_dir = self.workspace_dir / "ai-logs" / "aider-history-archive"
         
@@ -45,6 +61,10 @@ class AiderHistoryManager:
     
     def create_backup(self) -> str:
         """Create a timestamped backup of the history file."""
+        if not self.aider_history_file.exists():
+            print("📝 No .aider.chat.history.md file found to backup.")
+            return ""
+
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         backup_filename = f"aider_history_{timestamp}.md"
         backup_path = self.backup_dir / backup_filename
@@ -66,9 +86,15 @@ class AiderHistoryManager:
     
     def rotate_history(self, keep_recent_entries: int = 50) -> bool:
         """Rotate the history file, keeping only recent entries."""
+        if not self.aider_history_file.exists():
+            print("📝 No .aider.chat.history.md file found to rotate.")
+            return False
+
         try:
             # Create backup first
             backup_path = self.create_backup()
+            if not backup_path: # If backup failed or no file to backup
+                return False
             
             # Read current file
             with open(self.aider_history_file, 'r', encoding='utf-8') as f:
@@ -171,43 +197,83 @@ class AiderHistoryManager:
 
 def main():
     """Main backup and rotation logic."""
-    if len(sys.argv) > 1:
-        workspace_dir = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description="Aider Chat History Backup and Rotation Script."
+    )
+    parser.add_argument(
+        "--rotate-if-needed",
+        action="store_true",
+        help="Only perform backup and rotation if the history file exceeds size or age thresholds."
+    )
+    parser.add_argument(
+        "--get-metrics",
+        action="store_true",
+        help="Only display current Aider history metrics and exit."
+    )
+    parser.add_argument(
+        "workspace_dir",
+        nargs="?", # 0 or 1 argument
+        default=None,
+        help="Optional: The workspace directory. Defaults to MCP_SERVER_ROOT env var or current working directory."
+    )
+    args = parser.parse_args()
+
+    # Determine workspace_dir based on CLI arg or environment/cwd
+    if args.workspace_dir:
+        workspace_dir = Path(args.workspace_dir)
+        print(f"Using workspace from command line argument: {workspace_dir}")
     else:
-        workspace_dir = "/Users/jacquesv/MCP/aider-mcp"
+        workspace_dir = _get_workspace_dir()
     
     print(f"🔧 Aider History Manager - Workspace: {workspace_dir}")
     print("=" * 60)
     
     manager = AiderHistoryManager(workspace_dir)
     
-    # Get and display metrics
-    metrics = manager.get_backup_metrics()
-    print("\n📊 Current Aider History Metrics:")
-    print(f"  - Sessions in current file: {metrics['backed_up_sessions']}")
-    print(f"  - Current file size: {metrics['current_backup_size_mb']:.2f}MB")
-    print(f"  - Backup Health Status: {metrics['backup_health']}")
-    print("-" * 60)
+    if args.get_metrics:
+        metrics = manager.get_backup_metrics()
+        print("\n💾 Aider History Status...")
+        print(f"📊 Sessions in current file: {metrics['backed_up_sessions']}")
+        print(f"📏 Current file size: {metrics['current_backup_size_mb']:.2f}MB")
+        print(f"🏥 Backup Health Status: {metrics['backup_health']}")
+        print("-" * 60)
+        return # Exit after displaying metrics
 
-    # Check if file exists
-    if not manager.aider_history_file.exists():
-        print("📝 No .aider.chat.history.md file found - nothing to backup or rotate.")
-        print("\n✅ Aider history management complete!")
-        return
-    
-    # Check if rotation is needed
-    if manager.should_rotate():
-        print("🔄 Rotation needed - creating backup and rotating...")
-        success = manager.rotate_history()
-        if success:
-            print("✅ Rotation completed successfully")
+    # If --rotate-if-needed is specified
+    if args.rotate_if_needed:
+        if not manager.aider_history_file.exists():
+            print("📝 No .aider.chat.history.md file found - nothing to backup or rotate.")
+        elif manager.should_rotate():
+            print("🔄 Rotation needed - creating backup and rotating...")
+            success = manager.rotate_history()
+            if success:
+                print("✅ Rotation completed successfully")
+            else:
+                print("❌ Rotation failed")
         else:
-            print("❌ Rotation failed")
-    else:
-        print("💾 Creating backup (no rotation needed)...")
-        manager.create_backup()
+            print("📝 No rotation needed based on size or age thresholds.")
+            print("💾 Creating backup (as part of conditional run)...")
+            manager.create_backup() # Still create a backup even if no rotation
+    else: # Default behavior if no specific flags are passed
+        # Check if file exists
+        if not manager.aider_history_file.exists():
+            print("📝 No .aider.chat.history.md file found - nothing to backup or rotate.")
+            print("\n✅ Aider history management complete!")
+            return
+        
+        # Check if rotation is needed
+        if manager.should_rotate():
+            print("🔄 Rotation needed - creating backup and rotating...")
+            success = manager.rotate_history()
+            if success:
+                print("✅ Rotation completed successfully")
+            else:
+                print("❌ Rotation failed")
+        else:
+            print("💾 Creating backup (no rotation needed)...")
+            manager.create_backup()
     
-    # Cleanup old backups
+    # Cleanup old backups always runs unless --get-metrics was the only flag
     manager.cleanup_old_backups()
     
     print("\n✅ Aider history management complete!")
@@ -215,7 +281,8 @@ def main():
 
 def get_backup_metrics() -> dict:
     """Standalone function to get backup metrics for session bootstrap."""
-    manager = AiderHistoryManager()
+    # This function is called from other modules, so it needs to determine the workspace itself.
+    manager = AiderHistoryManager(_get_workspace_dir())
     return manager.get_backup_metrics()
 
 

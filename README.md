@@ -99,25 +99,122 @@ cd aider-mcp-upgraded
 ```
 
 ### **Claude Desktop Multi-Agent Configuration**
-Enable the complete multi-agent system in Claude Desktop:
 
-1. **Enable MCP Servers**:
-   - ✅ **Desktop Commander** (file operations & investigation)
-   - ✅ **Aider-MCP-Upgraded** (AI coding & automation)
+#### **1. Environment Setup & API Provider Configuration**
+Configure your `.env` file with AI provider API keys for optimal multi-agent performance:
 
-2. **Copy Project Instructions**:
-   ```bash
-   # Copy these files to Claude Desktop Project Instructions:
-   # prompts/context-management-engine_v4.md → Session automation & context
-   # prompts/project-system-instructions_v8.md → Multi-agent workflow optimization
-   ```
+```bash
+# 🔑 AI PROVIDER API KEYS - Required for model access
+OPENAI_API_KEY=sk-your-openai-key-here      # Required for GPT-4.1 models
+GEMINI_API_KEY=your-gemini-key-here         # Required for Gemini Flash/Pro
+ANTHROPIC_API_KEY=your-anthropic-key-here   # Optional for Claude Sonnet 4
 
-3. **Verify Multi-Agent Setup**:
-   ```python
-   # Test DC + Aider integration
-   get_system_health()  # Should show system status
-   # Ready for optimized AI coding!
-   ```
+# 🏠 PROJECT CONFIGURATION
+MCP_SERVER_ROOT=/path/to/your/project       # Auto-set by setup script
+UV_PATH=/opt/homebrew/bin/uv                 # Auto-detected UV path
+
+# 🎯 AUTO-DETECTION & OPTIMIZATION (70% Token Savings)
+ENABLE_AUTO_TARGET_DETECTION=true           # Auto-detect functions/classes from prompts
+ENABLE_CONTEXT_EXTRACTION=true              # Smart context pruning
+ENABLE_JS_TS_AUTO_DETECTION=true            # React, Next.js, TypeScript support
+```
+
+#### **2. Strategic Model Selection for Multi-Agent Workflow**
+Configure optimal models for different task types:
+
+```bash
+# 🧠 COMPLEXITY-BASED ROUTING
+AIDER_MODEL_HARD=gpt-4.1-2025-04-14                    # Complex algorithms
+AIDER_MODEL_COMPLEX=gemini/gemini-2.5-pro-preview-05-06 # Advanced reasoning  
+AIDER_MODEL_MEDIUM=gemini/gemini-2.5-flash-preview-05-20 # Balanced tasks
+AIDER_MODEL_EASY=gpt-4.1-mini-2025-04-14               # Simple implementations
+AIDER_MODEL_SIMPLE=gpt-4.1-nano-2025-04-14             # Quick fixes
+
+# 🛠️ TASK-TYPE OPTIMIZATION  
+AIDER_MODEL_WRITING=anthropic/claude-sonnet-4-20250514  # Documentation
+AIDER_MODEL_TESTING=gpt-4.1-mini-2025-04-14            # Test generation
+AIDER_MODEL_REFACTOR=anthropic/claude-sonnet-4-20250514 # Code refactoring
+AIDER_MODEL_ALGORITHM=gemini/gemini-2.5-pro-preview-05-06 # Complex logic
+```
+
+#### **3. Framework-Specific Model Configuration**
+Optimize for your tech stack:
+
+```bash
+# 🐍 PYTHON FRAMEWORKS
+AIDER_MODEL_DJANGO=gpt-4.1-mini-2025-04-14      # Django models, views
+AIDER_MODEL_FASTAPI=gpt-4.1-mini-2025-04-14     # FastAPI endpoints
+AIDER_MODEL_FLASK=gpt-4.1-mini-2025-04-14       # Flask routes
+
+# ⚛️ JAVASCRIPT/TYPESCRIPT FRAMEWORKS  
+AIDER_MODEL_REACT=gpt-4.1-mini-2025-04-14       # React components
+AIDER_MODEL_NEXTJS=gpt-4.1-mini-2025-04-14      # Next.js App Router
+AIDER_MODEL_TYPESCRIPT=gpt-4.1-mini-2025-04-14  # TypeScript interfaces
+AIDER_MODEL_ZOD=gpt-4.1-mini-2025-04-14         # Zod schemas
+```
+
+#### **4. Cost Management & Budget Controls**
+Prevent expensive surprises with automated cost controls:
+
+```bash
+# 💰 BUDGET ENFORCEMENT
+MAX_COST_PER_TASK=5.00              # Maximum cost per individual task
+MAX_DAILY_COST=50.00                # Daily spending limit
+MAX_MONTHLY_COST=500.00             # Monthly budget cap
+COST_WARNING_THRESHOLD=1.00         # Warn when task exceeds threshold
+ENABLE_COST_TRACKING=true           # Enable detailed analytics
+
+# 💲 MODEL PRICING (per 1M tokens, USD)
+GPT_4_1_MINI_INPUT_PRICE=0.40      # Update when pricing changes
+GPT_4_1_MINI_OUTPUT_PRICE=1.60
+GEMINI_PRO_INPUT_PRICE=1.25
+GEMINI_PRO_OUTPUT_PRICE=10.00
+```
+
+#### **5. Performance & Resilience Settings**
+Configure system stability and performance:
+
+```bash
+# ⚡ PERFORMANCE OPTIMIZATION
+MAX_CONCURRENT_TASKS=3               # Parallel execution limit
+MAX_TASK_QUEUE_SIZE=10              # Queue capacity
+CPU_USAGE_THRESHOLD=75.0            # Pause if CPU > 75%
+MEMORY_USAGE_THRESHOLD=80.0         # Pause if memory > 80%
+
+# 🛡️ RESILIENCE FEATURES
+CIRCUIT_BREAKER_FAILURE_THRESHOLD=3 # Failures before circuit breaks
+CIRCUIT_BREAKER_RESET_TIMEOUT=60    # Cooldown period (seconds)
+HEALTH_CHECK_INTERVAL=30            # Health check frequency
+```
+
+#### **6. Enable MCP Servers in Claude Desktop**
+Add these servers to your Claude Desktop configuration:
+
+1. **Desktop Commander**: File operations & investigation
+2. **Aider-MCP-Upgraded**: AI coding & automation
+
+```bash
+# Auto-update Claude Desktop config
+python app/scripts/update_claude_config.py
+```
+
+#### **7. Copy Project Instructions**
+```bash
+# Copy these files to Claude Desktop Project Instructions:
+# prompts/context-management-engine_v4.md → Session automation & context
+# prompts/project-system-instructions_v8.md → Multi-agent workflow optimization
+```
+
+#### **8. Verify Multi-Agent Setup**
+```python
+# Test DC + Aider integration
+get_system_health()  # Should show system status
+# Expected: {"status": "healthy", "auto_detection": "enabled", "cost_tracking": "active"}
+
+# Test bootstrap process
+python3 app/scripts/smart_bootstrap.py
+# Should load project context and show optimization metrics
+```
 
 ## 💡 Multi-Agent Usage Examples
 
