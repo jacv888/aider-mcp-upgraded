@@ -34,14 +34,8 @@ from app.scripts.aider_cost_analytics import get_cost_metrics
 metrics = get_cost_metrics()
 ```
 
-### `generate_claude_config.py`
-Generates Claude Desktop configuration files.
-
-### `setup.sh`
-One-command setup script for the entire Aider-MCP system.
-
 ### `update_claude_config.py`
-Updates existing Claude Desktop configuration.
+Automatically updates existing Claude Desktop configuration with Aider-MCP settings.
 
 ### `verify_github_setup.py`
 Verifies GitHub integration setup.

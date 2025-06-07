@@ -9,7 +9,44 @@ import subprocess
 import sys
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+
+def get_bootstrap_status_indicator() -> str:
+    """Return a visual indicator for bootstrap status"""
+    workspace_dir = os.getcwd()
+    bootstrap_marker = Path(workspace_dir) / ".session_bootstrap_complete"
+    
+    if not bootstrap_marker.exists():
+        return "🔴 NO-BOOTSTRAP"
+    
+    try:
+        with open(bootstrap_marker, 'r') as f:
+            data = json.load(f)
+            
+        last_bootstrap = datetime.fromisoformat(data['timestamp'])
+        age = datetime.now() - last_bootstrap
+        
+        if age < timedelta(hours=1):
+            return "🟢 FRESH-BOOTSTRAP"
+        elif age < timedelta(hours=4):
+            return "🟡 VALID-BOOTSTRAP"
+        else:
+            return "🟠 EXPIRED-BOOTSTRAP"
+            
+    except:
+        return "🔴 INVALID-BOOTSTRAP"
+
+def display_bootstrap_banner():
+    """Display bootstrap status banner"""
+    status = get_bootstrap_status_indicator()
+    
+    print("┌" + "─" * 50 + "┐")
+    print(f"│  Bootstrap Status: {status:<25} │")
+    print("└" + "─" * 50 + "┘")
+    
+    if "🔴" in status or "🟠" in status:
+        print("⚠️  Bootstrap required before AI coding tasks!")
+        print("🔧 Run: python3 app/scripts/complete_bootstrap.py")
 
 def run_command(cmd: list, description: str) -> tuple[bool, str]:
     """Run a command and return success status and output"""
@@ -32,6 +69,11 @@ def run_command(cmd: list, description: str) -> tuple[bool, str]:
 def complete_bootstrap(workspace_dir: str = None):
     """Execute complete bootstrap sequence"""
     workspace_dir = workspace_dir or os.getcwd()
+    
+    # Show current status first
+    display_bootstrap_banner()
+    print()
+    
     print("🚀 Executing Complete Session Bootstrap Template")
     print("=" * 60)
     
@@ -133,8 +175,13 @@ def main():
     parser = argparse.ArgumentParser(description="Complete Bootstrap Execution")
     parser.add_argument("--workspace", help="Workspace directory")
     parser.add_argument("--force", action="store_true", help="Force bootstrap even if recently completed")
+    parser.add_argument("--status-only", action="store_true", help="Show bootstrap status only, don't run full bootstrap")
     
     args = parser.parse_args()
+    
+    if args.status_only:
+        display_bootstrap_banner()
+        return
     
     # Check if bootstrap was already completed recently
     if not args.force:
