@@ -221,11 +221,15 @@ ai_task_cost = cost_manager.estimate_task_cost(
 ```bash
 # Quick functionality test
 cd /Users/jacquesv/MCP/aider-mcp
-python app/context/test_context.py
-
-# Full demonstration
-python app/context/demo.py
+python -c "
+import sys
+sys.path.insert(0, '.')
+from app.context import extract_context, ContextManager, ExtractionConfig
+print('✅ Context-Aware File Pruning imports successful!')
+"
 ```
+
+**Note**: Demo and test scripts have been removed as part of cleanup. The core functionality is available through the main API.
 
 ### Expected Output
 

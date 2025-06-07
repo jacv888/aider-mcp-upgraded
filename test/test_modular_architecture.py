@@ -8,10 +8,10 @@ class TestModularArchitecture(unittest.TestCase):
             import app.context.context_extractor
             import app.core.conflict_detector
             import app.core.logging
+            import app.core.resilience
             import app.cost.cost_manager
             import app.models.model_registry
-            import app.resilience.aider_mcp_resilience
-            import app.services.health_checks.config_validation_checks
+            import app.tools.health_monitoring_tools
         except ImportError as e:
             self.fail(f"Import failed: {e}")
 
